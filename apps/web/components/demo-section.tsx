@@ -1,15 +1,14 @@
-"use client"
+"use client";
 
-import { useAtom } from "jotai"
-import { useQuery } from "@tanstack/react-query"
-import { toast } from "@repo/ui/lib/toast"
-import { Button } from "@repo/ui/components/button"
-import { Bell, Database, Atom } from "lucide-react"
-import { countAtom } from "@/atom"
-
+import { useAtom } from "jotai";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "@repo/ui/lib/toast";
+import { Button } from "@repo/ui/components/button";
+import { Bell, Database, Atom } from "lucide-react";
+import { countAtom } from "@/atom";
 
 function JotaiDemo() {
-  const [count, setCount] = useAtom(countAtom)
+  const [count, setCount] = useAtom(countAtom);
 
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm">
@@ -23,18 +22,26 @@ function JotaiDemo() {
         Global atom state. The count persists across re-renders.
       </p>
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={() => setCount((c) => c - 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCount((c) => c - 1)}
+        >
           -
         </Button>
         <span className="min-w-[3ch] text-center text-lg font-bold tabular-nums">
           {count}
         </span>
-        <Button variant="outline" size="sm" onClick={() => setCount((c) => c + 1)}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCount((c) => c + 1)}
+        >
           +
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 // --- React Query demo ---
@@ -42,11 +49,17 @@ function ReactQueryDemo() {
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["demo-todo"],
     queryFn: async () => {
-      const id = Math.floor(Math.random() * 200) + 1
-      const res = await fetch(`https://jsonplaceholder.typicode.com/todos/${id}`)
-      return res.json() as Promise<{ id: number; title: string; completed: boolean }>
+      const id = Math.floor(Math.random() * 200) + 1;
+      const res = await fetch(
+        `https://jsonplaceholder.typicode.com/todos/${id}`,
+      );
+      return res.json() as Promise<{
+        id: number;
+        title: string;
+        completed: boolean;
+      }>;
     },
-  })
+  });
 
   return (
     <div className="rounded-lg border bg-card p-6 shadow-sm">
@@ -69,11 +82,16 @@ function ReactQueryDemo() {
           </span>
         ) : null}
       </div>
-      <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => refetch()}
+        disabled={isFetching}
+      >
         Fetch random todo
       </Button>
     </div>
-  )
+  );
 }
 
 // --- Toast demo ---
@@ -109,7 +127,7 @@ function ToastDemo() {
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 export function DemoSection() {
@@ -129,5 +147,5 @@ export function DemoSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

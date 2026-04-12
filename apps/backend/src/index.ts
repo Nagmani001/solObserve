@@ -16,27 +16,28 @@ const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 config({
-  path: `${path.join(__dirname, "..")}/.env`
+  path: `${path.join(__dirname, "..")}/.env`,
 });
 
 app.use(express.json());
 
-app.use(cors({
-  origin: [process.env.FRONTEND_URL_DEPLOYED!, "http://localhost:3000"],
-  optionsSuccessStatus: 200
-}));
+app.use(
+  cors({
+    origin: [process.env.FRONTEND_URL_DEPLOYED!, "http://localhost:3000"],
+    optionsSuccessStatus: 200,
+  }),
+);
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({
-    message: "healthy"
-  })
+    message: "healthy",
+  });
 });
-
 
 app.get("/error", (req: Request, res: Response) => {
   res.status(400).json({
-    message: "error"
-  })
+    message: "error",
+  });
 });
 
 export const server = app.listen(process.env.PORT, () => {
@@ -44,9 +45,9 @@ export const server = app.listen(process.env.PORT, () => {
 });
 
 // INFO: when the server is forcefully stopped from integration test , gracefully show the server down the server
-process.on('SIGINT', () => shutdown(0));
-process.on('SIGTERM', () => shutdown(0));
-process.on('uncaughtException', (err) => {
-  console.error('uncaught:', err);
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+process.on("uncaughtException", (err) => {
+  console.error("uncaught:", err);
   shutdown(1);
 });

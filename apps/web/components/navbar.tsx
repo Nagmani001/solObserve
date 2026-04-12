@@ -1,4 +1,4 @@
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {
   return (
@@ -12,5 +12,5 @@ export function Navbar() {
         </nav>
       </div>
     </header>
-  )
+  );
 }

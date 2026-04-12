@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { Toaster } from "@repo/ui/components/sonner"
+import * as React from "react";
+import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@repo/ui/components/sonner";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -12,21 +12,21 @@ function makeQueryClient() {
         staleTime: 60 * 1000,
       },
     },
-  })
+  });
 }
 
-let browserQueryClient: QueryClient | undefined = undefined
+let browserQueryClient: QueryClient | undefined = undefined;
 
 function getQueryClient() {
   if (typeof window === "undefined") {
-    return makeQueryClient()
+    return makeQueryClient();
   }
-  if (!browserQueryClient) browserQueryClient = makeQueryClient()
-  return browserQueryClient
+  if (!browserQueryClient) browserQueryClient = makeQueryClient();
+  return browserQueryClient;
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const queryClient = getQueryClient()
+  const queryClient = getQueryClient();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -41,5 +41,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <Toaster />
       </NextThemesProvider>
     </QueryClientProvider>
-  )
+  );
 }

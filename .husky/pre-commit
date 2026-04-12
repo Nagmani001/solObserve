@@ -1,0 +1,2 @@
+pnpm prettier --write "**/*.{ts,tsx,md}"
+git add -u

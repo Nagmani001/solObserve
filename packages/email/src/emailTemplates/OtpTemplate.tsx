@@ -10,7 +10,7 @@ import {
   Text,
   Tailwind,
   render,
-} from '@react-email/components';
+} from "@react-email/components";
 
 interface OtpTemplateProps {
   otp: string;
@@ -32,7 +32,9 @@ export const OtpTemplate = ({ otp }: OtpTemplateProps) => {
                 Hello,
               </Text>
               <Text className="text-[#333333] text-base leading-6 mb-6 text-left">
-                You requested a one-time password (OTP) for your Codeforces account. Please use the following code to complete your verification:
+                You requested a one-time password (OTP) for your Codeforces
+                account. Please use the following code to complete your
+                verification:
               </Text>
               <Section className="bg-[#f0f4f8] rounded-lg p-2 inline-block mb-6 min-w-[200px]">
                 <Text className="font-mono text-3xl font-bold text-[#2d3748] tracking-[6px] m-0 text-center">
@@ -40,12 +42,14 @@ export const OtpTemplate = ({ otp }: OtpTemplateProps) => {
                 </Text>
               </Section>
               <Text className="text-[#333333] text-base leading-6 mb-6 text-left">
-                This code will expire in 10 minutes. If you did not request this code, please ignore this email.
+                This code will expire in 10 minutes. If you did not request this
+                code, please ignore this email.
               </Text>
             </Section>
             <Section className="text-[#718096] text-xs text-center mt-6 border-t border-[#edf2f7] pt-6">
               <Text className="my-2">
-                &copy; {new Date().getFullYear()} Codeforces. All rights reserved.
+                &copy; {new Date().getFullYear()} Codeforces. All rights
+                reserved.
               </Text>
               <Text className="my-2">
                 This is an automated message, please do not reply.
@@ -58,6 +62,7 @@ export const OtpTemplate = ({ otp }: OtpTemplateProps) => {
   );
 };
 
-export const renderOtpTemplate = (otp: string) => render(<OtpTemplate otp={otp} />);
+export const renderOtpTemplate = (otp: string) =>
+  render(<OtpTemplate otp={otp} />);
 
 export default OtpTemplate;

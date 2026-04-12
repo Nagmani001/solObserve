@@ -8,7 +8,7 @@ describe("GET /", () => {
     const response = await axios.get(`${BACKEND_URL}/health`);
     expect(response.status).toBe(200);
     expect(response.data).toStrictEqual({
-      message: "healthy"
+      message: "healthy",
     });
   });
 
@@ -16,8 +16,7 @@ describe("GET /", () => {
     const response = await axios.get(`${BACKEND_URL}/error`);
     expect(response.status).toBe(400);
     expect(response.data).toStrictEqual({
-      message: "error"
+      message: "error",
     });
   });
 });
-
