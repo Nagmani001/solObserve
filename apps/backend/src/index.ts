@@ -1,10 +1,14 @@
 import express, { Request, Response } from "express";
+import { toNodeHandler } from "better-auth/node";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import path from "path";
 import { config } from "dotenv";
 import cors from "cors";
 import { shutdown } from "./lib/utils";
+import { auth } from "./lib/auth";
+import axios from "axios";
+import { authMiddleware } from "./middlewares/authMiddleware";
 
 /*INFO: use these to interact with database and send emails
 import { prisma } from "@repo/database/client";
@@ -19,14 +23,25 @@ config({
   path: `${path.join(__dirname, "..")}/.env`,
 });
 
-app.use(express.json());
+declare global {
+  namespace Express {
+    interface Request {
+      userId: string | null;
+    }
+  }
+}
 
 app.use(
   cors({
     origin: [process.env.FRONTEND_URL_DEPLOYED!, "http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     optionsSuccessStatus: 200,
+    credentials: true,
   }),
 );
+
+app.all("/api/auth/{*any}", toNodeHandler(auth));
+app.use(express.json());
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({
@@ -37,6 +52,13 @@ app.get("/health", (req: Request, res: Response) => {
 app.get("/error", (req: Request, res: Response) => {
   res.status(400).json({
     message: "error",
+  });
+});
+
+app.get("/api/v1/todos", authMiddleware, async (req, res) => {
+  const todos = await axios.get("https://dummyjson.com/todos");
+  res.json({
+    todo: todos.data,
   });
 });
 

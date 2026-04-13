@@ -15,6 +15,8 @@
     "@tanstack/react-query": "^5.90.21",
     "@types/axios": "^0.14.4",
     "axios": "^1.13.5",
+    "better-auth": "^1.5.1",
+    "framer-motion": "^12.34.4",
     "jotai": "^2.17.1",
     "lucide-react": "^0.563.0",
     "next": "16.1.5",
@@ -23,6 +25,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@repo/common": "workspace:*",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@tailwindcss/postcss": "^4.1.18",

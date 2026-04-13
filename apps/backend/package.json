@@ -16,10 +16,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@repo/email": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/dotenv": "^8.2.3",
-    "@repo/email": "workspace:*",
     "@types/express": "^5.0.6",
+    "axios": "^1.13.5",
+    "better-auth": "^1.5.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1"
