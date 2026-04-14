@@ -9,6 +9,7 @@ export default async function sendEmailViaResend(options: ResendEmailOptions) {
       subject: options.subject!,
       react: options.react,
     });
+    return { data, error };
   } else if (options.html) {
     const { data, error } = await resend!.emails.send({
       from: "Nagmani <nagmani@email.nagmaniupadhyay.com.np>",
@@ -16,5 +17,6 @@ export default async function sendEmailViaResend(options: ResendEmailOptions) {
       subject: options.subject!,
       react: options.react,
     });
+    return { data, error };
   }
 }

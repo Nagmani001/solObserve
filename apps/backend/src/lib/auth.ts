@@ -61,6 +61,7 @@ INFO: uncomment this in production
           await sendEmail({
             to: email,
             react: OtpTemplate({ otp }),
+            subject: "otp vefirication",
           });
         }
       },
