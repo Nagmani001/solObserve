@@ -1,38 +1,61 @@
 import { Resend } from "resend";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import path from "path";
-import { config } from "dotenv";
+import { createTransport, type Transporter } from "nodemailer";
 import sendEmailViaResend from "./sendViaResend";
 import sendEmailViaNodemailer from "./sendViaNodemailer";
 import { ResendEmailOptions } from "./resend/types";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+export interface EmailConfig {
+  resendApiKey?: string;
+  smtp?: {
+    host: string;
+    port: number;
+    user?: string;
+    password?: string;
+  };
+}
 
-config({
-  path: `${path.join(__dirname, "..")}/.env`,
-});
+let resend: Resend | null = null;
+let transporter: Transporter | null = null;
 
-export const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+export function initEmail(config: EmailConfig) {
+  resend = null;
+  transporter = null;
+
+  if (config.resendApiKey) {
+    resend = new Resend(config.resendApiKey);
+    return;
+  }
+
+  if (config.smtp) {
+    transporter = createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      auth: {
+        user: config.smtp.user,
+        pass: config.smtp.password,
+      },
+      secure: false,
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+  }
+}
 
 export async function sendEmail(options: ResendEmailOptions) {
   if (resend) {
-    return await sendEmailViaResend(options);
+    return await sendEmailViaResend(resend, options);
   }
 
-  const smptConfigured = Boolean(
-    process.env.SMTP_PORT && process.env.SMTP_HOST,
-  );
-
-  if (smptConfigured) {
+  if (transporter) {
     return await sendEmailViaNodemailer({
       to: options.to,
       subject: options.subject!,
       react: options.react,
+      transporter,
     });
   }
+
   console.log("errow seding email , neither smpt nor resend is configured");
 }
 

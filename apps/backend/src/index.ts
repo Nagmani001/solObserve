@@ -9,6 +9,8 @@ import { shutdown } from "./lib/utils";
 import { auth } from "./lib/auth";
 import axios from "axios";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { initEmail } from "@repo/email/email";
+import { Server } from "http";
 
 /*INFO: use these to interact with database and send emails
 import { prisma } from "@repo/database/client";
@@ -62,9 +64,28 @@ app.get("/api/v1/todos", authMiddleware, async (req, res) => {
   });
 });
 
-export const server = app.listen(process.env.PORT, () => {
-  console.log(`server running on port ${process.env.PORT}`);
-});
+export let server: Server;
+function main() {
+  if (process.env.RESEND_API_KEY) {
+    initEmail({
+      resendApiKey: process.env.RESEND_API_KEY,
+    });
+  } else if (process.env.SMTP_HOST && process.env.SMTP_PORT) {
+    initEmail({
+      smtp: {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
+        user: process.env.SMTP_USER,
+        password: process.env.SMTP_PASSWORD,
+      },
+    });
+  }
+
+  server = app.listen(process.env.PORT, () => {
+    console.log(`server running on port ${process.env.PORT}`);
+  });
+}
+main();
 
 // INFO: when the server is forcefully stopped from integration test , gracefully show the server down the server
 process.on("SIGINT", () => shutdown(0));
