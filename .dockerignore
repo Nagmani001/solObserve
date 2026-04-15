@@ -1,0 +1,27 @@
+ # VCS
+  .git
+  .gitignore
+
+  # Dependencies / package manager caches
+  **/node_modules
+  .pnpm-store
+  .npm
+  .yarn
+  .yarn-cache
+
+  # Build artifacts / caches
+  **/.next
+  **/dist
+  **/build
+  **/.turbo
+  **/coverage
+  **/*.tsbuildinfo
+
+  # Env and secrets
+  **/.env
+  **/.env.*
+  !**/.env.example
+
+  # Logs / local noise
+  **/*.log
+  .DS_Store
