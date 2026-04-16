@@ -1,0 +1,84 @@
+  name: CD
+
+  on:
+    push:
+      branches: [main]
+
+  env:
+    REGISTRY: ghcr.io  # GitHub Container Registry (free, private, no Docker Hub limits)
+    IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+
+  jobs:
+    # Step 1: Figure out what changed
+    changes:
+      runs-on: ubuntu-latest
+      outputs:
+        backend: ${{ steps.filter.outputs.backend }}
+        web: ${{ steps.filter.outputs.web }}
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dorny/paths-filter@v3
+          id: filter
+          with:
+            filters: |
+              backend:
+                - 'apps/backend/**'
+                - 'packages/database/**'
+                - 'packages/common/**'
+                - 'packages/email/**'
+                - 'docker/backend/**'
+              web:
+                - 'apps/web/**'
+                - 'packages/ui/**'
+                - 'packages/common/**'
+                - 'docker/web/**'
+
+    # Step 2: Build and push only what changed
+    build-backend:
+      needs: changes
+      if: needs.changes.outputs.backend == 'true'
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}  
+
+        - name: Build and push backend
+          uses: docker/build-push-action@v6
+          with:
+            context: .
+            file: docker/backend/Dockerfile
+            push: true
+            tags: |
+              ${{ env.IMAGE_PREFIX }}/backend:${{ github.sha }}
+              ${{ env.IMAGE_PREFIX }}/backend:latest
+
+    build-web:
+      needs: changes
+      if: needs.changes.outputs.web == 'true'
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Log in to GitHub Container Registry
+          uses: docker/login-action@v3
+          with:
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Build and push web
+          uses: docker/build-push-action@v6
+          with:
+            context: .
+            file: docker/web/Dockerfile
+            push: true
+            tags: |
+              ${{ env.IMAGE_PREFIX }}/web:${{ github.sha }}
+              ${{ env.IMAGE_PREFIX }}/web:latest
+
