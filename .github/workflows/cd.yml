@@ -6,7 +6,7 @@
 
   env:
     REGISTRY: ghcr.io  # GitHub Container Registry (free, private, no Docker Hub limits)
-    IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+    IMAGE_PREFIX: ghcr.io/nagmani001/template
 
   jobs:
     # Step 1: Figure out what changed
