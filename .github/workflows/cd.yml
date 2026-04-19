@@ -38,6 +38,9 @@
       needs: changes
       if: needs.changes.outputs.backend == 'true'
       runs-on: ubuntu-latest
+      permissions:
+       contents: read
+       packages: write
       steps:
         - uses: actions/checkout@v4
 
@@ -62,6 +65,9 @@
       needs: changes
       if: needs.changes.outputs.web == 'true'
       runs-on: ubuntu-latest
+      permissions:
+       contents: read
+       packages: write
       steps:
         - uses: actions/checkout@v4
 
