@@ -61,7 +61,7 @@ app.get("/api/v1/todos", authMiddleware, async (req, res) => {
   const todos = await axios.get("https://dummyjson.com/todos");
   res.json({
     todo: todos.data,
-    message: "failed",
+    message: "Success",
   });
 });
 
