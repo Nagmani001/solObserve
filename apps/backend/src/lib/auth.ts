@@ -19,7 +19,11 @@ INFO: uncomment this in production
     }
   },
    */
-  trustedOrigins: [process.env.FRONTEND_URL_DEPLOYED as string],
+  trustedOrigins: [
+    process.env.FRONTEND_URL_DEPLOYED!,
+    "http://localhost:3000",
+    "http://web:3000",
+  ],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,

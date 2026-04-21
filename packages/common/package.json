@@ -10,8 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@repo/typescript-config": "workspace:*",
     "zod": "4.3.5"
+  },
+
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*"
   },
   "exports": {
     "./zodTypes": "./src/zodTypes.ts",

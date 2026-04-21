@@ -3,8 +3,7 @@ services:
     image: postgres
     container_name: database 
     restart: always
-    environment:
-      - POSTGRES_PASSWORD=nagmani
+    env_file: .env.development
     ports:
       - '5432:5432'
     healthcheck:
@@ -31,15 +30,7 @@ services:
     ports:
       - "3001:3001"
 
-    environment:
-      - PORT=3001
-      - FRONTEND_URL_DEPLOYED=http://web:3000
-      - SMTP_HOST=mailhog
-      - SMTP_PORT=1025
-      - SMTP_USER=user
-      - SMTP_PASSWORD=password
-      - DATABASE_URL=postgresql://postgres:nagmani@database:5432/postgres
-
+    env_file: .env.development
     depends_on:
       database:
         condition: service_healthy
@@ -57,9 +48,10 @@ services:
       context: ../../
     ports:
       - "3000:3000"
-
     environment:
-      - BACKEND_URL=http://backend:3001
+      - PORT=3000
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:3001
+    env_file: .env.development
     depends_on:
       backend:
         condition: service_healthy

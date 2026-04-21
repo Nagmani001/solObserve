@@ -1,5 +1,5 @@
 ARG NODE_VERSION=24.13.1
-FROM node:${NODE_VERSION}-slim AS base
+FROM node:${NODE_VERSION}-alpine AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -16,7 +16,7 @@ FROM base AS builder
 WORKDIR /app
 
 COPY --from=prepare /app/out/json/ .
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY --from=prepare /app/out/full/ .
 # no build step since we will use tsx
@@ -30,7 +30,8 @@ RUN pnpm add -g tsx
 RUN addgroup --system --gid 1001 expressjs
 RUN adduser --system --uid 1001 expressjs
 USER expressjs
+
 COPY --from=builder /app .
 
 EXPOSE 3001
-CMD ["tsx","apps/backend/src/index.ts"] 
+CMD ["tsx","apps/backend/src/index.ts"]

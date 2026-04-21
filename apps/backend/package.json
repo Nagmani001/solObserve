@@ -9,17 +9,16 @@
     "dev:ci": "pnpm dlx tsx src/index.ts"
   },
   "devDependencies": {
-    "@repo/database": "workspace:*",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@repo/typescript-config": "workspace:*"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@repo/database": "workspace:*",
     "@repo/email": "workspace:*",
-    "@types/cors": "^2.8.19",
-    "@types/dotenv": "^8.2.3",
-    "@types/express": "^5.0.6",
     "axios": "^1.13.5",
     "better-auth": "^1.5.1",
     "cors": "^2.8.6",

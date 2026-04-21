@@ -1,5 +1,5 @@
 ARG NODE_VERSION=24.13.1
-FROM node:${NODE_VERSION}-slim AS base
+FROM node:${NODE_VERSION}-alpine AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -17,12 +17,12 @@ FROM base AS builder
 WORKDIR /app
 
 COPY --from=prepare /app/out/json/ .
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY --from=prepare /app/out/full/ .
 RUN pnpm build 
 
-FROM node:${NODE_VERSION}-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 ENV HOSTNAME="0.0.0.0"
 

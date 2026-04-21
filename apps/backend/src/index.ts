@@ -35,7 +35,11 @@ declare global {
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL_DEPLOYED!, "http://localhost:3000"],
+    origin: [
+      process.env.FRONTEND_URL_DEPLOYED!,
+      "http://localhost:3000",
+      "http://web:3000",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE"],
     optionsSuccessStatus: 200,
     credentials: true,

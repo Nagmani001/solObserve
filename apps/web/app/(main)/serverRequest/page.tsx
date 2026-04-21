@@ -1,9 +1,10 @@
+import { getBackendUrl } from "@/lib/util";
 import axios from "axios";
 import { cookies } from "next/headers";
 
 export default async function Page() {
   const cookie = await cookies();
-  const todo = await axios.get("http://localhost:3001/api/v1/todos", {
+  const todo = await axios.get(`${getBackendUrl()}/api/v1/todos`, {
     headers: {
       cookie: cookie.toString(),
     },

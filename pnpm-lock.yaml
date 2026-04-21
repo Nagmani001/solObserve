@@ -23,24 +23,18 @@ importers:
 
   apps/backend:
     dependencies:
+      '@repo/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@repo/email':
         specifier: workspace:*
         version: link:../../packages/email
-      '@types/cors':
-        specifier: ^2.8.19
-        version: 2.8.19
-      '@types/dotenv':
-        specifier: ^8.2.3
-        version: 8.2.3
-      '@types/express':
-        specifier: ^5.0.6
-        version: 5.0.6
       axios:
         specifier: ^1.13.5
         version: 1.13.5
       better-auth:
         specifier: ^1.5.1
-        version: 1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
+        version: 1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -51,21 +45,21 @@ importers:
         specifier: ^5.2.1
         version: 5.2.1
     devDependencies:
-      '@repo/database':
-        specifier: workspace:*
-        version: link:../../packages/database
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@types/cors':
+        specifier: ^2.8.19
+        version: 2.8.19
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
 
   apps/integration-test:
     dependencies:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
-      '@types/axios':
-        specifier: ^0.14.4
-        version: 0.14.4
       '@types/node':
         specifier: ^22.15.3
         version: 22.15.3
@@ -74,7 +68,7 @@ importers:
         version: 1.13.5
       vitest:
         specifier: ^4.0.18
-        version: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+        version: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
   apps/web:
     dependencies:
@@ -84,15 +78,12 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.90.21
         version: 5.90.21(react@19.2.0)
-      '@types/axios':
-        specifier: ^0.14.4
-        version: 0.14.4
       axios:
         specifier: ^1.13.5
         version: 1.13.5
       better-auth:
         specifier: ^1.5.1
-        version: 1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
+        version: 1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
       framer-motion:
         specifier: ^12.34.4
         version: 12.34.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -145,12 +136,13 @@ importers:
 
   packages/common:
     dependencies:
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
       zod:
         specifier: 4.3.5
         version: 4.3.5
+    devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
 
   packages/database:
     dependencies:
@@ -194,18 +186,6 @@ importers:
       '@react-email/render':
         specifier: ^2.0.4
         version: 2.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
-      '@repo/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/dotenv':
-        specifier: ^8.2.3
-        version: 8.2.3
-      '@types/nodemailer':
-        specifier: ^7.0.10
-        version: 7.0.10
-      dotenv:
-        specifier: ^17.3.1
-        version: 17.3.1
       nodemailer:
         specifier: ^8.0.1
         version: 8.0.1
@@ -216,6 +196,12 @@ importers:
         specifier: ^6.9.2
         version: 6.9.2(@react-email/render@2.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0))
     devDependencies:
+      '@repo/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/nodemailer':
+        specifier: ^7.0.10
+        version: 7.0.10
       '@types/react':
         specifier: ^19.2.8
         version: 19.2.14
@@ -2022,10 +2008,6 @@ packages:
     peerDependencies:
       react: ^18 || ^19
 
-  '@types/axios@0.14.4':
-    resolution: {integrity: sha512-9JgOaunvQdsQ/qW2OPmE5+hCeUB52lQSolecrFrthct55QekhmXEwT203s20RL+UHtCQc15y3VXpby9E7Kkh/g==}
-    deprecated: This is a stub types definition. axios provides its own type definitions, so you do not need this installed.
-
   '@types/body-parser@1.19.6':
     resolution: {integrity: sha512-HLFeCYgz89uk22N5Qg3dvGvsv46B8GLvKKo1zKG4NybA8U2DiEO3w9lqGg29t/tfLRJpJ6iQxnVw4OnB7MoM9g==}
 
@@ -2040,10 +2022,6 @@ packages:
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
-
-  '@types/dotenv@8.2.3':
-    resolution: {integrity: sha512-g2FXjlDX/cYuc5CiQvyU/6kkbP1JtmGzh0obW50zD7OKeILVL0NSpPWLXVfqoAGQjom2/SLLx9zHq0KXvD6mbw==}
-    deprecated: This is a stub types definition. dotenv provides its own type definitions, so you do not need this installed.
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
@@ -4339,6 +4317,11 @@ packages:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
 
+  yaml@2.8.2:
+    resolution: {integrity: sha512-mplynKqc1C2hTVYxd0PU2xQAc22TI1vShAYGksCCfxbn/dFwnHTNi1bvYsBTkhdUNtGIf5xNOg938rrSSYvS9A==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
@@ -5934,12 +5917,6 @@ snapshots:
       '@tanstack/query-core': 5.90.20
       react: 19.2.0
 
-  '@types/axios@0.14.4':
-    dependencies:
-      axios: 1.13.5
-    transitivePeerDependencies:
-      - debug
-
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
@@ -5959,10 +5936,6 @@ snapshots:
       '@types/node': 22.15.3
 
   '@types/deep-eql@4.0.2': {}
-
-  '@types/dotenv@8.2.3':
-    dependencies:
-      dotenv: 17.3.1
 
   '@types/estree@1.0.8': {}
 
@@ -6132,13 +6105,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.0.3
 
-  '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))':
+  '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
       '@vitest/spy': 4.0.18
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+      vite: 7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
   '@vitest/pretty-format@4.0.18':
     dependencies:
@@ -6271,7 +6244,7 @@ snapshots:
 
   baseline-browser-mapping@2.9.11: {}
 
-  better-auth@1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)):
+  better-auth@1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)):
     dependencies:
       '@better-auth/core': 1.5.1(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1)
       '@better-auth/drizzle-adapter': 1.5.1(@better-auth/core@1.5.1(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)))
@@ -6300,11 +6273,11 @@ snapshots:
       prisma: 7.4.0(@types/react@19.2.14)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
-      vitest: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+      vitest: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
 
-  better-auth@1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)):
+  better-auth@1.5.1(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)))(mongodb@7.1.0)(mysql2@3.15.3)(next@16.1.5(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(pg@8.18.0)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)):
     dependencies:
       '@better-auth/core': 1.5.1(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1)
       '@better-auth/drizzle-adapter': 1.5.1(@better-auth/core@1.5.1(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.0(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.16.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.18.0)(postgres@3.4.7)(prisma@7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)))
@@ -6333,7 +6306,7 @@ snapshots:
       prisma: 7.4.0(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.2)
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
-      vitest: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+      vitest: 4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
 
@@ -8380,7 +8353,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0):
+  vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       esbuild: 0.27.3
       fdir: 6.5.0(picomatch@4.0.3)
@@ -8394,11 +8367,12 @@ snapshots:
       jiti: 2.6.1
       lightningcss: 1.30.2
       tsx: 4.21.0
+      yaml: 2.8.2
 
-  vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0):
+  vitest@4.0.18(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
+      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18
@@ -8415,7 +8389,7 @@ snapshots:
       tinyexec: 1.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vite: 7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)
+      vite: 7.3.1(@types/node@22.15.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.15.3
@@ -8494,6 +8468,9 @@ snapshots:
   wrappy@1.0.2: {}
 
   xtend@4.0.2: {}
+
+  yaml@2.8.2:
+    optional: true
 
   yocto-queue@0.1.0: {}
 

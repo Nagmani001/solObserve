@@ -85,22 +85,59 @@ Key variables:
 
    This starts both the backend (port 3001) and web (port 3000) in watch mode.
 
-### With Docker (full stack)
+### With Docker (development — full stack)
 
-Run everything — database, Mailhog, backend, and frontend — in containers:
+This runs everything — database, Mailhog, backend, and frontend — in containers.
 
-```sh
-docker compose -f ./docker/compose-files/docker-compose.yml up -d --wait --build
-```
+1. **Copy the environment file**
 
-- Web: http://localhost:3000
-- Backend: http://localhost:3001
-- Mailhog UI: http://localhost:8025
+   ```sh
+   cp docker/compose-files/.env.development.example docker/compose-files/.env.development
+   ```
+
+2. **Fill in your OAuth credentials** in `docker/compose-files/.env.development`
+
+   The following need your own values (the rest work out of the box):
+
+   | Variable               | Where to get it                                                           |
+   | ---------------------- | ------------------------------------------------------------------------- |
+   | `GITHUB_CLIENT_ID`     | [GitHub Developer Settings](https://github.com/settings/developers)       |
+   | `GITHUB_CLIENT_SECRET` | Same as above                                                             |
+   | `GOOGLE_CLIENT_ID`     | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+   | `GOOGLE_CLIENT_SECRET` | Same as above                                                             |
+
+   > Social login won't work without these, but email/password auth will.
+
+3. **Start the services**
+
+   ```sh
+   docker compose -f ./docker/compose-files/docker-compose-development.yml up -d --wait --build
+   ```
+
+4. **Run database migrations**
+
+   Make sure `packages/database/.env` has the Docker database URL:
+
+   ```
+   DATABASE_URL="postgresql://postgres:nagmani@localhost:5432/postgres"
+   ```
+
+   Then migrate:
+
+   ```sh
+   cd packages/database
+   pnpm dlx prisma migrate dev
+   ```
+
+5. **Open the app**
+   - Web: http://localhost:3000
+   - Backend: http://localhost:3001
+   - Mailhog UI: http://localhost:8025 (catches all emails sent in dev)
 
 To stop:
 
 ```sh
-docker compose -f ./docker/compose-files/docker-compose.yml down
+docker compose -f ./docker/compose-files/docker-compose-development.yml down
 ```
 
 ### With Docker (auxiliary services only)
