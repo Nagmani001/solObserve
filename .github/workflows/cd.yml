@@ -88,3 +88,36 @@
               ${{ env.IMAGE_PREFIX }}/web:${{ github.sha }}
               ${{ env.IMAGE_PREFIX }}/web:latest
 
+# Boilerplate CD 
+#      deploy:
+#       needs: [build-backend, build-web]
+#       # Run even if one build was skipped (nothing changed in that app)
+#       if: always() && (needs.build-backend.result == 'success' || needs.build-web.result == 'success' || needs.build-backend.result == 'skipped' || needs.build-web.result == 'skipped')
+#       runs-on: ubuntu-latest
+#       steps:
+#         - name: Deploy to EC2
+#           uses: appleboy/ssh-action@v1
+#           with:
+#             host: ${{ secrets.SSH_HOST }}
+#             username: ${{ secrets.SSH_USERNAME }}
+#             key: ${{ secrets.SSH_KEY }}
+#             script: |
+#               cd /home/${{ secrets.SSH_USERNAME }}/app
+#
+#               # Pull latest images
+#               docker compose pull
+#
+#               # Run database migrations
+#               docker compose run --rm backend npx prisma migrate deploy
+#
+#               # Restart services with zero downtime
+#               # --no-deps prevents restarting dependencies (database)
+#               docker compose up -d --no-deps --wait backend
+#               docker compose up -d --no-deps --wait web
+#
+#               # Verify health
+#               curl -f http://localhost:3001/health || exit 1
+#               curl -f http://localhost:3000 || exit 1
+#
+#               # Clean up old images
+#               docker image prune -f
