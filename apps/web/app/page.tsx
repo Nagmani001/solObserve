@@ -1,10 +1,16 @@
+import { HealthIndicator } from "@/components/health-indicator";
+
 export default function Home() {
   return (
-    <main>
-      <section className="flex flex-col items-center justify-center gap-6 px-4 py-24 md:py-32 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          Landing page
-        </h1>
+    <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+      <section className="w-full max-w-md rounded-xl border bg-card p-8 shadow-sm">
+        <h1 className="text-3xl font-semibold tracking-tight">SolObserve</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Zero-config observability for Solana programs.
+        </p>
+        <div className="mt-6">
+          <HealthIndicator />
+        </div>
       </section>
     </main>
   );

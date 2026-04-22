@@ -40,6 +40,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Rust
+target/
+
+# Compose volumes
+data/
+
 # Misc
 .DS_Store
 *.pem

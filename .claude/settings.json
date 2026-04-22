@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7",
+    "shadcn",
+    "playwright",
+    "github",
+    "postgres",
+    "fetch"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(cargo:*)",
+      "Bash(rustup:*)",
+      "Bash(rustc:*)",
+      "Bash(turbo:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker:*)",
+      "Bash(make:*)",
+      "Bash(just:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(ls:*)",
+      "Bash(rtk *)",
+      "mcp__context7__*",
+      "mcp__shadcn__*",
+      "mcp__playwright__*",
+      "mcp__postgres__*",
+      "mcp__fetch__*"
+    ],
+    "ask": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)",
+      "mcp__github__*"
+    ]
+  }
+}

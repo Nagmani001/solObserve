@@ -1,0 +1,12 @@
+[package]
+name = "solobserve-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+dotenvy.workspace = true
+serde.workspace = true
+thiserror.workspace = true

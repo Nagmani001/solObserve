@@ -13,7 +13,7 @@ export default async function Page() {
   return (
     <div>
       hi
-      {/*@ts-ignore*/}
+      {/*@ts-expect-error untyped backend response*/}
       {todo.data.todo.todos[0].todo}
     </div>
   );
