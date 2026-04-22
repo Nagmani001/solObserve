@@ -1,4 +1,4 @@
-# Template Monorepo
+# solObserve Monorepo
 
 Turborepo monorepo with a Next.js frontend, Express backend, PostgreSQL database, authentication (Better Auth), and email support.
 

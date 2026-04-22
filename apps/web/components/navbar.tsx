@@ -14,9 +14,9 @@ export function Navbar() {
       <div className="mx-auto flex h-14 w-full max-w-screen-2xl items-center justify-between px-4 md:px-8">
         <Link href="/" className="flex items-center gap-2">
           <div className="grid size-7 place-items-center rounded-full border border-[var(--auth-border)] bg-[var(--auth-surface)] text-xs font-bold text-[var(--auth-text)]">
-            T
+            S
           </div>
-          <span className="text-lg font-bold tracking-tight">Template</span>
+          <span className="text-lg font-bold tracking-tight">solObserve</span>
         </Link>
         <nav className="flex items-center gap-2">
           <UserMenu />

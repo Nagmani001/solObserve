@@ -39,10 +39,10 @@ export function GenericAuthPage({
       <div className="text-center mb-8">
         <Link href="/" className="inline-flex items-center gap-2 mb-6">
           <div className="grid size-8 place-items-center rounded-full border border-[var(--auth-border)] bg-[var(--auth-surface)] text-xs font-bold text-[var(--auth-text)]">
-            T
+            S
           </div>
           <span className="text-lg font-bold text-[var(--auth-text)]">
-            Template
+            solObserve
           </span>
         </Link>
         <h1 className="text-2xl font-bold text-[var(--auth-text)]">{title}</h1>
