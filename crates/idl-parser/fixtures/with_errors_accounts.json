@@ -1,0 +1,27 @@
+{
+
+  "address": "Stake11111111111111111111111111111111111111",
+
+  "metadata": { "name": "errs", "version": "1.0.0", "spec": "0.1.0", "description": "fixture" },
+
+
+  "instructions": [{ "name": "noop", "accounts": [], "args": [] }],
+
+  "accounts": [],
+  "events": [],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "ArithmeticOverflow",
+      "msg": "math"
+    },
+
+    {
+      "code": 6001,
+      "name": "CustomError",
+
+      "msg": "oops"
+    }
+  ],
+  "types": [{}]
+}

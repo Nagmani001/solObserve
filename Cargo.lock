@@ -44,17 +44,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
-name = "api-gateway"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "solobserve-config",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "async-nats"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1621,6 +1610,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "idl-parser"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.18",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "idna"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2459,6 +2461,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2669,9 +2682,11 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-s3",
  "clickhouse",
+ "dotenvy",
  "solobserve-config",
  "sqlx",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
 ]
 

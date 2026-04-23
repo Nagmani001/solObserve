@@ -5,6 +5,15 @@ use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use solobserve_config::Config;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 
+/// Apply sqlx migrations bundled with this crate (must run before Prisma app uses new tables).
+pub async fn run_pg_migrations(pool: &PgPool) -> Result<()> {
+    sqlx::migrate!("./migrations")
+        .run(pool)
+        .await
+        .context("postgres migrations")?;
+    Ok(())
+}
+
 pub async fn pg_pool(cfg: &Config) -> Result<PgPool> {
     PgPoolOptions::new()
         .max_connections(10)

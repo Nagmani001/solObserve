@@ -6,7 +6,12 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "env": ["DATABASE_URL", "POSTGRES_URL", "PORT", "FRONTEND_URL_DEPLOYED", "SMTP_*", "RESEND_API_KEY"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**",
+        "generated/**"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]

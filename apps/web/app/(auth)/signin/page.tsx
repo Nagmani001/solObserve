@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GenericAuthPage } from "@/components/generic-auth-page";
 import { SocialAuthButtons } from "@/components/social-auth-buttons";
+import { MagicLinkBlock } from "./magic-link-block";
 
 export default function Page() {
   const [email, setEmail] = useState("");
@@ -31,7 +32,7 @@ export default function Page() {
       if (res.error) {
         toast.error(res.error.message);
       } else {
-        router.push("/dashboard");
+        router.push("/orgs");
       }
     },
     onError: (err) => {
@@ -52,10 +53,12 @@ export default function Page() {
       <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-[var(--auth-border)]" />
         <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--auth-text-muted)]">
-          or continue with email
+          magic link or password
         </span>
         <div className="h-px flex-1 bg-[var(--auth-border)]" />
       </div>
+
+      <MagicLinkBlock />
 
       <form
         onSubmit={(e) => {

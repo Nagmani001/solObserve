@@ -75,3 +75,161 @@ model Verification {
   @@unique([identifier])
   @@map("verification")
 }
+
+enum OrgMemberRole {
+  owner
+  admin
+  editor
+  viewer
+
+  @@map("org_member_role")
+}
+
+enum SolanaCluster {
+  mainnet
+  devnet
+  testnet
+  localnet
+
+  @@map("solana_cluster")
+}
+
+enum ProgramStatus {
+  active
+  paused
+  archived
+
+  @@map("program_status")
+}
+
+enum IdlSource {
+  upload
+  on_chain
+  manual
+
+  @@map("idl_source")
+}
+
+// Control-plane tables migrated via sqlx (see crates/solobserve-storage/migrations). Do not prisma-migrate these.
+model SolobserveUser {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email      String
+  name       String
+  imageUrl   String?   @map("image_url")
+  authUserId String    @unique @map("auth_user_id")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  orgMembers OrgMember[]
+  idlsUploaded Idl[] @relation("IdlUploader")
+
+  @@unique([email])
+  @@map("users")
+}
+
+model Org {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String      @unique
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  projects  Project[]
+  members   OrgMember[]
+  apiKeys   ApiKey[]
+  auditLogs AuditLog[]
+
+  @@map("orgs")
+}
+
+model OrgMember {
+  orgId  String          @map("org_id") @db.Uuid
+  userId String          @map("user_id") @db.Uuid
+  role   OrgMemberRole
+
+  org  Org           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user SolobserveUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, userId])
+  @@index([userId])
+  @@map("org_members")
+}
+
+model Project {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId     String      @map("org_id") @db.Uuid
+  name      String
+  slug      String
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  programs SolanaProgram[]
+
+  @@unique([orgId, slug])
+  @@map("projects")
+}
+
+model SolanaProgram {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String           @map("project_id") @db.Uuid
+  programId   String           @map("program_id")
+  cluster     SolanaCluster
+  displayName String           @map("display_name")
+  status      ProgramStatus    @default(active)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  idls    Idl[]
+
+  @@unique([projectId, programId, cluster])
+  @@index([projectId])
+  @@map("programs")
+}
+
+model Idl {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk  String       @map("program_id_fk") @db.Uuid
+  version      Int
+  rawJson      Json         @map("raw_json") @db.JsonB
+  parsedJson   Json         @map("parsed_json") @db.JsonB
+  source       IdlSource    @default(upload)
+  uploadedById String?      @map("uploaded_by") @db.Uuid
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program    SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  uploadedBy SolobserveUser? @relation("IdlUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([programIdFk, version])
+  @@map("idls")
+}
+
+model ApiKey {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId        String    @map("org_id") @db.Uuid
+  name         String
+  prefix       String
+  hashedSecret String    @map("hashed_secret")
+  scopes       Json      @db.JsonB
+  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("api_keys")
+}
+
+model AuditLog {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId       String?    @map("org_id") @db.Uuid
+  actorUserId String?    @map("actor_user_id") @db.Uuid
+  action      String
+  targetType  String     @map("target_type")
+  targetId    String     @map("target_id")
+  metadata    Json       @db.JsonB
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("audit_log")
+}

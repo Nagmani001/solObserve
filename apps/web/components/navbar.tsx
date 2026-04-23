@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@repo/ui/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
+import { OrgSwitcher } from "@/components/org-switcher";
 
 export function Navbar() {
   return (
@@ -19,6 +20,7 @@ export function Navbar() {
           <span className="text-lg font-bold tracking-tight">solObserve</span>
         </Link>
         <nav className="flex items-center gap-2">
+          <OrgSwitcher />
           <UserMenu />
           <ThemeToggle />
         </nav>

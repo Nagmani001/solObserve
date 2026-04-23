@@ -1,10 +1,17 @@
 import { betterAuth } from "better-auth";
+import { createElement } from "react";
 import { OtpTemplate } from "@repo/email/template/OtpTemplate";
 import { emailOTP } from "better-auth/plugins";
+import { magicLink } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@repo/database/client";
 import { sendEmail } from "@repo/email/email";
 import { createAuthMiddleware } from "better-auth/api";
+
+const googleEnv =
+  process.env.GOOGLE_CLIENT_ID &&
+  process.env.GOOGLE_CLIENT_SECRET &&
+  process.env.GOOGLE_CLIENT_ID.length > 0;
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -20,9 +27,13 @@ INFO: uncomment this in production
   },
    */
   trustedOrigins: [
-    process.env.FRONTEND_URL_DEPLOYED!,
     "http://localhost:3000",
     "http://web:3000",
+    ...(process.env.FRONTEND_URL_DEPLOYED
+      ? [
+          process.env.FRONTEND_URL_DEPLOYED.replace(/\/$/, ""),
+        ]
+      : []),
   ],
   emailAndPassword: {
     enabled: true,
@@ -53,12 +64,42 @@ INFO: uncomment this in production
       clientId: process.env.GITHUB_CLIENT_ID as string,
       clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
     },
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    },
+    ...(googleEnv
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+          },
+        }
+      : {}),
   },
   plugins: [
+    magicLink({
+      sendMagicLink: async ({ url, email }) => {
+        if (process.env.RESEND_API_KEY || process.env.SMTP_HOST) {
+          await sendEmail({
+            to: email,
+            subject: "SolObserve magic link",
+            react: createElement(
+              "div",
+              null,
+              createElement(
+                "p",
+                null,
+                createElement(
+                  "a",
+                  { href: url },
+                  "Sign in to SolObserve",
+                ),
+              ),
+              createElement("p", null, `Or paste: ${url}`),
+            ),
+          });
+          return;
+        }
+        console.log(`[solobserve magic link] ${email} -> ${url}`);
+      },
+    }),
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
         if (type === "email-verification" || type === "forget-password") {

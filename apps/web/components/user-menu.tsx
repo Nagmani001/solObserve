@@ -101,9 +101,9 @@ export function UserMenu() {
           asChild
           className="cursor-pointer rounded-lg px-3 py-2"
         >
-          <Link href="/dashboard">
+          <Link href="/orgs">
             <UserCircle2 className="size-4 text-[var(--auth-text-muted)]" />
-            Profile
+            Workspaces
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator className="bg-[var(--auth-border)]" />

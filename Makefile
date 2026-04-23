@@ -1,4 +1,4 @@
-.PHONY: dev down up fmt lint test reset compose-up compose-down
+.PHONY: dev down up fmt lint test reset compose-up compose-down migrate-db
 
 COMPOSE := docker compose -f infra/docker-compose.yml
 
@@ -17,6 +17,11 @@ dev: compose-up
 fmt:
 	cargo fmt --all
 	pnpm format
+
+migrate-db:
+	cargo build -p solobserve-storage --bin solobserve-migrate --release
+	@if [ -z "$${DATABASE_URL}" ] && [ -z "$${POSTGRES_URL}" ]; then echo "Set DATABASE_URL or POSTGRES_URL"; exit 1; fi
+	DATABASE_URL="$${DATABASE_URL:-$$POSTGRES_URL}" ./target/release/solobserve-migrate
 
 lint:
 	cargo fmt --all -- --check

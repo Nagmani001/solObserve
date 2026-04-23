@@ -64,6 +64,15 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      - name: Verify idl-parser WASM toolchain
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build -p idl-parser --release --target wasm32-unknown-unknown --features wasm
+          cargo install wasm-bindgen-cli --locked --version 0.2.121
+          wasm-bindgen target/wasm32-unknown-unknown/release/idl_parser.wasm \
+            --nodejs --typescript \
+            --out-dir /tmp/idl-wasm-verify
+
   integration-test:
     runs-on: ubuntu-latest
     steps:

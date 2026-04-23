@@ -23,8 +23,12 @@ docker compose -f "$PROJECT_ROOT/docker/compose-files/docker-compose-integration
 echo '🟡 - Waiting for database to be ready...'
 $PROJECT_ROOT/apps/integration-test/src/scripts/wait-for-it.sh localhost:5432 -- echo "database has started"
 
-echo "Applying migration"
-cd $PROJECT_ROOT/packages/database && DATABASE_URL="postgresql://postgres:nagmani@localhost:5432/postgres" pnpm dlx prisma migrate dev --name init --schema "$PROJECT_ROOT/packages/database/prisma/schema.prisma"
+echo "Applying Prisma migrations (Better Auth tables only)"
+cd $PROJECT_ROOT/packages/database && DATABASE_URL="postgresql://postgres:nagmani@localhost:5432/postgres" pnpm dlx prisma migrate deploy --schema "$PROJECT_ROOT/packages/database/prisma/schema.prisma"
+
+echo "Apply sqlx control-plane migrations"
+cd "$PROJECT_ROOT" && cargo build -p solobserve-storage --release --bin solobserve-migrate
+DATABASE_URL="postgresql://postgres:nagmani@localhost:5432/postgres" ./target/release/solobserve-migrate
 
 echo "Generate Client"
 cd $PROJECT_ROOT/packages/database && pnpm dlx prisma generate --schema "$PROJECT_ROOT/packages/database/prisma/schema.prisma"

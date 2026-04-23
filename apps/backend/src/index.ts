@@ -9,14 +9,12 @@ import { shutdown } from "./lib/utils";
 import { auth } from "./lib/auth";
 import axios from "axios";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { solobserveAuthMiddleware } from "./middlewares/solobserveAuth";
+import { programsRouter } from "./routes/programs";
+import { prisma } from "@repo/database/client";
 import { initEmail } from "@repo/email/email";
 import { Server } from "http";
-
-/*INFO: use these to interact with database and send emails
-import { prisma } from "@repo/database/client";
-import OtpTemplate from "@repo/email/template/OtpTemplate";
-import { sendEmail } from "@repo/email/email";
- */
+import { logger } from "./lib/logger";
 
 const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,13 +31,17 @@ declare global {
   }
 }
 
+const corsOrigins = [
+  "http://localhost:3000",
+  "http://web:3000",
+  ...(process.env.FRONTEND_URL_DEPLOYED
+    ? [process.env.FRONTEND_URL_DEPLOYED.replace(/\/$/, "")]
+    : []),
+];
+
 app.use(
   cors({
-    origin: [
-      process.env.FRONTEND_URL_DEPLOYED!,
-      "http://localhost:3000",
-      "http://web:3000",
-    ],
+    origin: corsOrigins,
     methods: ["GET", "POST", "PUT", "DELETE"],
     optionsSuccessStatus: 200,
     credentials: true,
@@ -54,6 +56,18 @@ app.get("/health", (req: Request, res: Response) => {
     message: "healthy",
   });
 });
+
+app.get("/healthz", async (_req: Request, res: Response) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "healthz");
+    res.status(503).json({ ok: false });
+  }
+});
+
+app.use("/v1/programs", solobserveAuthMiddleware, programsRouter);
 
 app.get("/error", (req: Request, res: Response) => {
   res.status(400).json({
@@ -87,7 +101,7 @@ function main() {
   }
 
   server = app.listen(process.env.PORT, () => {
-    console.log(`server running on port ${process.env.PORT}`);
+    logger.info({ port: process.env.PORT }, "backend listening");
   });
 }
 main();

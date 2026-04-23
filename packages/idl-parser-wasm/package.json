@@ -1,0 +1,14 @@
+{
+  "name": "@repo/idl-parser-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./wrapper.js"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').accessSync(require('path').join('pkg','idl_parser.js'))\"",
+    "rebuild:wasm": "cargo build --manifest-path ../../crates/idl-parser/Cargo.toml --release --target wasm32-unknown-unknown --features wasm && wasm-bindgen ../../target/wasm32-unknown-unknown/release/idl_parser.wasm --nodejs --typescript --out-dir ./pkg"
+  },
+  "files": ["pkg", "wrapper.js"]
+}

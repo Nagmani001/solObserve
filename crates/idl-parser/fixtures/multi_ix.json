@@ -1,0 +1,25 @@
+{
+  "address": "BPFLoaderUpgradeable11111111111111111111111",
+  "metadata": {
+
+    "name": "stub_program",
+    "version": "0.0.1",
+    "spec": "0.1.0"
+
+  },
+
+  "instructions": [
+    { "name": "init", "accounts": [], "args": [{ "name": "p", "type": "pubkey" }] },
+    { "name": "close", "accounts": [], "args": [] }
+  ],
+  "accounts": [{ "name": "State", "type": { "kind": "struct", "fields": [] } }],
+  "events": [
+    { "name": "StuffHappened", "fields": [{ "name": "n", "type": "u64", "index": false }] }
+  ],
+  "errors": [
+    { "code": 4200, "name": "Boom", "msg": "test" }
+
+  ],
+
+  "types": []
+}

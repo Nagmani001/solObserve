@@ -11,10 +11,14 @@ type Provider = "google" | "github";
 export function SocialAuthButtons() {
   const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
 
+  const googleEnabled =
+    typeof process.env.NEXT_PUBLIC_ENABLE_GOOGLE_OAUTH === "string" &&
+    process.env.NEXT_PUBLIC_ENABLE_GOOGLE_OAUTH === "1";
+
   async function handleSocialSignIn(provider: Provider) {
     try {
       setLoadingProvider(provider);
-      const callbackURL = `${window.location.origin}/dashboard`;
+      const callbackURL = `${window.location.origin}/orgs`;
       const { error } = await authClient.signIn.social({
         provider,
         callbackURL,
@@ -32,17 +36,19 @@ export function SocialAuthButtons() {
 
   return (
     <div className="space-y-3">
-      <Button
-        type="button"
-        onClick={() => handleSocialSignIn("google")}
-        disabled={loadingProvider !== null}
-        className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-surface-strong)] py-3 text-sm font-semibold text-[var(--auth-text)] hover:bg-[var(--auth-surface)]"
-      >
-        <GoogleIcon />
-        {loadingProvider === "google"
-          ? "Redirecting..."
-          : "Continue with Google"}
-      </Button>
+      {googleEnabled && (
+        <Button
+          type="button"
+          onClick={() => handleSocialSignIn("google")}
+          disabled={loadingProvider !== null}
+          className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-surface-strong)] py-3 text-sm font-semibold text-[var(--auth-text)] hover:bg-[var(--auth-surface)]"
+        >
+          <GoogleIcon />
+          {loadingProvider === "google"
+            ? "Redirecting..."
+            : "Continue with Google"}
+        </Button>
+      )}
 
       <Button
         type="button"
