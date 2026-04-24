@@ -29,9 +29,7 @@ export default async function ProgramHomePage({
   });
 
   if (!program) {
-    return (
-      <p className="text-sm text-muted-foreground">Program not found.</p>
-    );
+    return <p className="text-sm text-muted-foreground">Program not found.</p>;
   }
 
   const latest = program.idls[0];

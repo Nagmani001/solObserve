@@ -10,7 +10,8 @@ export default async function OrgSettingsPage({
   const { orgId } = await params;
   const gate = await requireOrgRole(orgId, "viewer");
 
-  const canInvite = !gate.forbidden && ["owner", "admin"].includes(gate.member.role);
+  const canInvite =
+    !gate.forbidden && ["owner", "admin"].includes(gate.member.role);
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-8">

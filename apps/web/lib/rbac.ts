@@ -39,7 +39,27 @@ export async function ensureAppUser() {
   return { session, appUser };
 }
 
-export async function requireOrgRole(orgId: string, minRole: OrgRole) {
+export type OrgMembership = {
+  orgId: string;
+  userId: string;
+  role: OrgRole;
+};
+
+export type AppUserLite = {
+  id: string;
+  authUserId: string;
+  email: string;
+  name: string;
+};
+
+export type RequireOrgRoleResult =
+  | { forbidden: true; member: OrgMembership; appUser: AppUserLite }
+  | { forbidden: false; member: OrgMembership; appUser: AppUserLite };
+
+export async function requireOrgRole(
+  orgId: string,
+  minRole: OrgRole,
+): Promise<RequireOrgRoleResult> {
   const { appUser } = await ensureAppUser();
   const member = await prisma.orgMember.findUnique({
     where: {
@@ -49,12 +69,22 @@ export async function requireOrgRole(orgId: string, minRole: OrgRole) {
   if (!member) {
     redirect("/orgs");
   }
-  type R = keyof typeof roleRank;
-  const r = member.role as R;
+  const r = member.role as OrgRole;
+  const lite: OrgMembership = {
+    orgId: member.orgId,
+    userId: member.userId,
+    role: r,
+  };
+  const userLite: AppUserLite = {
+    id: appUser.id,
+    authUserId: appUser.authUserId,
+    email: appUser.email,
+    name: appUser.name,
+  };
   if (roleRank[r] < roleRank[minRole]) {
-    return { forbidden: true as const, member, appUser };
+    return { forbidden: true, member: lite, appUser: userLite };
   }
-  return { forbidden: false as const, member, appUser };
+  return { forbidden: false, member: lite, appUser: userLite };
 }
 
 export async function canOrgRole(orgId: string, minRole: OrgRole) {

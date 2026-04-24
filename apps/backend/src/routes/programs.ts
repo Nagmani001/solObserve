@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Router as ExpressRouter } from "express";
 import { prisma } from "@repo/database/client";
 import { PublicKey } from "@solana/web3.js";
 import { parseIdl } from "@repo/idl-parser-wasm";
@@ -27,7 +27,7 @@ const postIdlBody = z.object({
   idl_json: z.unknown(),
 });
 
-export const programsRouter = Router();
+export const programsRouter: ExpressRouter = Router();
 
 type AccessOk = { appUserId: string | null };
 type AccessErr = { error: true; status: number; body: Record<string, unknown> };
@@ -341,8 +341,7 @@ programsRouter.post("/:id/idl", async (req, res) => {
     typeof normalizedJson === "object" &&
     "programAddress" in normalizedJson
       ? String(
-          (normalizedJson as { programAddress?: unknown }).programAddress ??
-            "",
+          (normalizedJson as { programAddress?: unknown }).programAddress ?? "",
         ).trim()
       : "";
 

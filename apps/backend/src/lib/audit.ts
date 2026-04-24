@@ -20,7 +20,7 @@ export async function writeAuditRow(
       action: input.action,
       targetType: input.targetType,
       targetId: input.targetId,
-      metadata: input.metadata ?? {},
+      metadata: (input.metadata ?? {}) as object,
     },
   });
 }

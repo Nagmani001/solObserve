@@ -94,7 +94,9 @@ export function AddProgramDialog({
     toast.success("Program registered.");
     setOpen(false);
     if ("programId" in result && result.programId) {
-      router.push(`/org/${orgId}/project/${projectId}/program/${result.programId}`);
+      router.push(
+        `/org/${orgId}/project/${projectId}/program/${result.programId}`,
+      );
       router.refresh();
     }
   }

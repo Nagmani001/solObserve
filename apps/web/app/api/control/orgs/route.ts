@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@repo/database/client";
 import { fetchBackendSession } from "@/lib/session";
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   const session = await fetchBackendSession();
   if (!session) {
     return NextResponse.json({ orgs: [] }, { status: 401 });

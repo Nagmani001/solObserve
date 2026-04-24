@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./wrapper.js"
+    ".": {
+      "types": "./wrapper.d.ts",
+      "default": "./wrapper.js"
+    }
   },
+  "types": "./wrapper.d.ts",
   "scripts": {
     "build": "node -e \"require('fs').accessSync(require('path').join('pkg','idl_parser.js'))\"",
     "rebuild:wasm": "cargo build --manifest-path ../../crates/idl-parser/Cargo.toml --release --target wasm32-unknown-unknown --features wasm && wasm-bindgen ../../target/wasm32-unknown-unknown/release/idl_parser.wasm --nodejs --typescript --out-dir ./pkg"
   },
-  "files": ["pkg", "wrapper.js"]
+  "files": ["pkg", "wrapper.js", "wrapper.d.ts"]
 }

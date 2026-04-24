@@ -23,9 +23,7 @@ export default async function ProjectProgramsPage({
   });
 
   if (!project) {
-    return (
-      <p className="text-sm text-muted-foreground">Project not found.</p>
-    );
+    return <p className="text-sm text-muted-foreground">Project not found.</p>;
   }
 
   return (
@@ -69,8 +67,8 @@ export default async function ProjectProgramsPage({
 
       {project.programs.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          No programs registered. Add one to prepare for ingestion (Implementation
-          Plan 3).
+          No programs registered. Add one to prepare for ingestion
+          (Implementation Plan 3).
         </p>
       )}
     </div>

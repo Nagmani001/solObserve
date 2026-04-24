@@ -88,14 +88,20 @@ export async function createProject(orgId: string, name: string) {
   return { ok: true, projectId: project.id };
 }
 
-export async function inviteOrgMember(orgId: string, email: string, roleRaw: string) {
+export async function inviteOrgMember(
+  orgId: string,
+  email: string,
+  roleRaw: string,
+) {
   const gate = await requireOrgRole(orgId, "admin");
   if (gate.forbidden) {
     return { error: "Insufficient role to invite members." };
   }
 
   if (roleRaw === "owner") {
-    return { error: "Transferring ownership is not supported in this invite flow." };
+    return {
+      error: "Transferring ownership is not supported in this invite flow.",
+    };
   }
   const role =
     roleRaw === "viewer" || roleRaw === "editor" || roleRaw === "admin"
