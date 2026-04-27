@@ -157,6 +157,21 @@ impl SolanaRpcClient {
         }
     }
 
+    /// Snapshot of per-endpoint (calls, errors) counters for metrics scraping.
+    pub async fn health_snapshot(&self) -> Vec<(String, u64, u64)> {
+        let h = self.health.lock().await;
+        self.endpoints
+            .iter()
+            .map(|ep| {
+                let (c, e) = h
+                    .get(&ep.http_url)
+                    .map(|v| (v.calls as u64, v.errors as u64))
+                    .unwrap_or((0, 0));
+                (ep.http_url.clone(), c, e)
+            })
+            .collect()
+    }
+
     async fn rpc_call(&self, method: &str, params: Value) -> Result<Value> {
         let mut retries = 0u32;
         let mut delay = Duration::from_millis(200);

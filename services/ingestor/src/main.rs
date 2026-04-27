@@ -13,6 +13,8 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
+mod metrics;
+
 #[derive(Debug, Clone)]
 struct ProgramConfig {
     id: String,
@@ -34,6 +36,17 @@ async fn main() -> Result<()> {
     let s3 = s3_client(&cfg).await;
 
     ensure_streams(&js).await?;
+
+    metrics::touch();
+    let metrics_port: u16 = std::env::var("INGESTOR_METRICS_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(9100);
+    tokio::spawn(async move {
+        if let Err(e) = metrics::serve(metrics_port).await {
+            error!(error = ?e, "metrics server failed");
+        }
+    });
 
     let workers: Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(HashMap::new()));
@@ -197,6 +210,7 @@ async fn run_program_worker(
             .await
             {
                 warn!(error = ?e, signature = %n.signature, "failed ingest signature");
+                metrics::TX_FAILED_TOTAL.inc();
                 record_error(
                     &pg,
                     &cfg,
@@ -215,6 +229,7 @@ async fn run_program_worker(
             .await
             .ok();
         promote_or_rollback(&pg, &js, &cfg, &pending, &rpc).await?;
+        metrics::report_endpoint_health(&rpc.health_snapshot().await);
         tokio::time::sleep(Duration::from_secs(3)).await;
     }
 }
@@ -360,8 +375,12 @@ async fn ingest_signature(
         serde_json::to_vec(&msg)?.into(),
     )
     .await?;
+    metrics::TX_FETCHED_TOTAL.inc();
 
     let now_slot = rpc.get_slot().await.unwrap_or(slot);
+    metrics::LAG_SLOTS
+        .with_label_values(&[&cfg.program_id, &cfg.cluster])
+        .set(now_slot.saturating_sub(slot) as i64);
     sqlx::query(
         r#"
         INSERT INTO ingestion_state(program_id_fk, cluster, last_processed_slot, last_processed_signature, last_seen_at, lag_slots)
@@ -445,6 +464,7 @@ async fn promote_or_rollback(
                 serde_json::to_vec(&rollback)?.into(),
             )
             .await?;
+            metrics::REORGS_DETECTED_TOTAL.inc();
             record_error(
                 pg,
                 cfg,

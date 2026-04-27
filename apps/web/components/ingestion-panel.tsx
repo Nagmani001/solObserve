@@ -91,7 +91,12 @@ export function IngestionPanel({ programId }: { programId: string }) {
           <Button size="sm" onClick={onStart} disabled={busy || enabled}>
             Start
           </Button>
-          <Button size="sm" variant="outline" onClick={onStop} disabled={busy || !enabled}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onStop}
+            disabled={busy || !enabled}
+          >
             Stop
           </Button>
           <div className="flex items-center gap-2">
@@ -100,7 +105,12 @@ export function IngestionPanel({ programId }: { programId: string }) {
               onChange={(e) => setHours(e.target.value)}
               className="w-20"
             />
-            <Button size="sm" variant="outline" onClick={onBackfill} disabled={busy}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onBackfill}
+              disabled={busy}
+            >
               Backfill
             </Button>
           </div>
@@ -110,7 +120,8 @@ export function IngestionPanel({ programId }: { programId: string }) {
       <div className="rounded-lg border p-4">
         <h3 className="text-sm font-medium">Tracked Accounts</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          v1 uses explicit addresses only. Auto-discovery via getProgramAccounts is avoided for free RPC stability.
+          v1 uses explicit addresses only. Auto-discovery via getProgramAccounts
+          is avoided for free RPC stability.
         </p>
         <div className="mt-3 flex gap-2">
           <Input
@@ -125,7 +136,10 @@ export function IngestionPanel({ programId }: { programId: string }) {
         </div>
         <ul className="mt-3 space-y-1">
           {(data?.trackedAccounts ?? []).map((a, i) => (
-            <li key={`${a.account}-${i}`} className="font-mono text-xs text-muted-foreground">
+            <li
+              key={`${a.account}-${i}`}
+              className="font-mono text-xs text-muted-foreground"
+            >
               {a.account}
             </li>
           ))}
@@ -142,7 +156,9 @@ export function IngestionPanel({ programId }: { programId: string }) {
             </li>
           ))}
           {(data?.errors ?? []).length === 0 && (
-            <li className="text-muted-foreground">No recent ingestion errors.</li>
+            <li className="text-muted-foreground">
+              No recent ingestion errors.
+            </li>
           )}
         </ul>
       </div>

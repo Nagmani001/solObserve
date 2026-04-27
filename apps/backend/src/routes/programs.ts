@@ -30,7 +30,12 @@ const postIdlBody = z.object({
 });
 
 const postBackfillBody = z.object({
-  hours: z.number().int().min(1).max(24 * 30).default(24),
+  hours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30)
+    .default(24),
 });
 
 const postAccountBody = z.object({
@@ -441,7 +446,11 @@ programsRouter.post("/:id/ingestion/start", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   await prisma.ingestionConfig.upsert({
     where: { programIdFk: program.id },
@@ -480,7 +489,11 @@ programsRouter.post("/:id/ingestion/stop", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   await prisma.ingestionConfig.upsert({
     where: { programIdFk: program.id },
@@ -522,7 +535,11 @@ programsRouter.post("/:id/ingestion/backfill", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   await publishIngestControl({
     op: "backfill",
@@ -549,7 +566,11 @@ programsRouter.get("/:id/ingestion/status", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
 
   const [config, state, errors, accounts] = await Promise.all([
@@ -590,7 +611,11 @@ programsRouter.post("/:id/accounts", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const row = await prisma.trackedAccount.create({
     data: {
@@ -614,7 +639,9 @@ function defaultRpcForCluster(cluster: string): string {
   if (cluster === "devnet") return "https://api.devnet.solana.com";
   if (cluster === "testnet") return "https://api.testnet.solana.com";
   if (cluster === "localnet")
-    return process.env.SOLANA_LOCALNET_RPC || "http://host.docker.internal:8899";
+    return (
+      process.env.SOLANA_LOCALNET_RPC || "http://host.docker.internal:8899"
+    );
   return "https://api.mainnet-beta.solana.com";
 }
 

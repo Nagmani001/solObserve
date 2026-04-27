@@ -225,33 +225,45 @@ async function authedBackendFetch(path: string, init: RequestInit) {
 }
 
 export async function ingestionStatus(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/status`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/ingestion/status`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
 export async function startIngestion(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/start`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/ingestion/start`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
 export async function stopIngestion(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/stop`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/ingestion/stop`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
 export async function runBackfill(programId: string, hours: number) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/backfill`, {
-    method: "POST",
-    body: JSON.stringify({ hours }),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/ingestion/backfill`,
+    {
+      method: "POST",
+      body: JSON.stringify({ hours }),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
