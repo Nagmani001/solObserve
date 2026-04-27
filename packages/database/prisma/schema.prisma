@@ -110,6 +110,13 @@ enum IdlSource {
   @@map("idl_source")
 }
 
+enum CommitmentPromotion {
+  confirmed
+  finalized
+
+  @@map("commitment_promotion")
+}
+
 // Control-plane tables migrated via sqlx (see crates/solobserve-storage/migrations). Do not prisma-migrate these.
 model SolobserveUser {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -178,6 +185,10 @@ model SolanaProgram {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   idls    Idl[]
+  ingestionConfig IngestionConfig?
+  ingestionStates IngestionState[]
+  ingestionErrors IngestionError[]
+  trackedAccounts TrackedAccount[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
@@ -232,4 +243,64 @@ model AuditLog {
 
   @@index([orgId])
   @@map("audit_log")
+}
+
+model IngestionConfig {
+  programIdFk          String              @id @map("program_id_fk") @db.Uuid
+  cluster              SolanaCluster
+  enabled              Boolean             @default(true)
+  primaryEndpoint      String              @map("primary_endpoint")
+  fallbackEndpoints    String[]            @default([]) @map("fallback_endpoints")
+  commitmentPromotion  CommitmentPromotion @default(confirmed) @map("commitment_promotion")
+  backfillWindowHours  Int                 @default(24) @map("backfill_window_hours")
+  startedAt            DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
+  pausedAt             DateTime?           @map("paused_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@map("ingestion_configs")
+}
+
+model IngestionState {
+  programIdFk            String       @map("program_id_fk") @db.Uuid
+  cluster                SolanaCluster
+  lastProcessedSlot      BigInt       @default(0) @map("last_processed_slot")
+  lastProcessedSignature String?      @map("last_processed_signature")
+  lastSeenAt             DateTime     @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  lagSlots               Int          @default(0) @map("lag_slots")
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@id([programIdFk, cluster])
+  @@map("ingestion_state")
+}
+
+model IngestionError {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk String        @map("program_id_fk") @db.Uuid
+  cluster     SolanaCluster
+  kind        String
+  message     String
+  signature   String?
+  slot        BigInt?
+  occurredAt  DateTime      @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  resolvedAt  DateTime?     @map("resolved_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@index([programIdFk, occurredAt(sort: Desc)])
+  @@map("ingestion_errors")
+}
+
+model TrackedAccount {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk String        @map("program_id_fk") @db.Uuid
+  cluster     SolanaCluster
+  account     String
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@unique([programIdFk, cluster, account])
+  @@map("tracked_accounts")
 }

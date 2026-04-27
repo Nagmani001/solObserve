@@ -34,6 +34,7 @@ export function AddProgramDialog({
   const [cluster, setCluster] = useState<(typeof clusters)[number]>("devnet");
   const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState(false);
+  const [autoEnableIngestion, setAutoEnableIngestion] = useState(true);
   const router = useRouter();
 
   const pubkeyOk = useMemo(() => {
@@ -75,6 +76,7 @@ export function AddProgramDialog({
       programId: programId.trim(),
       cluster,
       idlJson,
+      autoEnableIngestion,
     });
     setBusy(false);
 
@@ -155,6 +157,14 @@ export function AddProgramDialog({
               placeholder='{ "address": "...", "metadata": {...}, ... }'
             />
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={autoEnableIngestion}
+              onChange={(e) => setAutoEnableIngestion(e.target.checked)}
+            />
+            Auto-start ingestion after registration
+          </label>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"

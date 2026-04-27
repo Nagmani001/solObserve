@@ -147,6 +147,7 @@ export async function registerProgram(input: {
   programId: string;
   cluster: "mainnet" | "devnet" | "testnet" | "localnet";
   idlJson: unknown;
+  autoEnableIngestion?: boolean;
 }) {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
@@ -171,6 +172,7 @@ export async function registerProgram(input: {
     program_id: input.programId,
     cluster: input.cluster,
     idl_json: input.idlJson,
+    auto_enable_ingestion: input.autoEnableIngestion ?? true,
   });
 
   const res = await fetch(`${getBackendUrl()}/v1/programs`, {
@@ -203,4 +205,60 @@ export async function registerProgram(input: {
   }
 
   return { ok: true, programId: id };
+}
+
+async function authedBackendFetch(path: string, init: RequestInit) {
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
+  return fetch(`${getBackendUrl()}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      cookie: cookieHeader,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function ingestionStatus(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/status`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function startIngestion(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/start`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function stopIngestion(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/stop`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function runBackfill(programId: string, hours: number) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/ingestion/backfill`, {
+    method: "POST",
+    body: JSON.stringify({ hours }),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function addTrackedAccount(programId: string, account: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/accounts`, {
+    method: "POST",
+    body: JSON.stringify({ account }),
+  });
+  return (await res.json()) as Record<string, unknown>;
 }

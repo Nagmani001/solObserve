@@ -6,6 +6,7 @@ import { z } from "zod";
 import { writeAuditRow } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
 import type { SolobserveAuth } from "../middlewares/solobserveAuth.js";
+import { getJetstream } from "../lib/nats.js";
 
 const roleRank = {
   viewer: 0,
@@ -21,10 +22,19 @@ const postProgramBody = z.object({
   program_id: z.string().min(32).max(50),
   cluster: z.enum(["mainnet", "devnet", "testnet", "localnet"]),
   idl_json: z.unknown(),
+  auto_enable_ingestion: z.boolean().optional().default(true),
 });
 
 const postIdlBody = z.object({
   idl_json: z.unknown(),
+});
+
+const postBackfillBody = z.object({
+  hours: z.number().int().min(1).max(24 * 30).default(24),
+});
+
+const postAccountBody = z.object({
+  account: z.string().min(32).max(50),
 });
 
 export const programsRouter: ExpressRouter = Router();
@@ -83,7 +93,8 @@ programsRouter.post("/", async (req, res) => {
     });
   }
 
-  const { project_id, program_id, cluster, idl_json } = parsed.data;
+  const { project_id, program_id, cluster, idl_json, auto_enable_ingestion } =
+    parsed.data;
 
   try {
     new PublicKey(program_id);
@@ -158,6 +169,25 @@ programsRouter.post("/", async (req, res) => {
         },
       });
 
+      if (auto_enable_ingestion) {
+        await tx.ingestionConfig.upsert({
+          where: { programIdFk: prog.id },
+          create: {
+            programIdFk: prog.id,
+            cluster,
+            enabled: true,
+            primaryEndpoint: defaultRpcForCluster(cluster),
+            fallbackEndpoints: [],
+            commitmentPromotion: "confirmed",
+            backfillWindowHours: 24,
+          },
+          update: {
+            enabled: true,
+            pausedAt: null,
+          },
+        });
+      }
+
       await writeAuditRow(tx, {
         orgId: project.orgId,
         actorUserId: access.appUserId,
@@ -173,6 +203,14 @@ programsRouter.post("/", async (req, res) => {
 
       return prog;
     });
+
+    if (auto_enable_ingestion) {
+      await publishIngestControl({
+        op: "start",
+        program_id_fk: created.id,
+        cluster,
+      });
+    }
 
     return res.status(201).json({ id: created.id });
   } catch (e: unknown) {
@@ -394,3 +432,207 @@ programsRouter.post("/:id/idl", async (req, res) => {
     return res.status(500).json({ error: "internal_error" });
   }
 });
+
+programsRouter.post("/:id/ingestion/start", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  await prisma.ingestionConfig.upsert({
+    where: { programIdFk: program.id },
+    create: {
+      programIdFk: program.id,
+      cluster: program.cluster,
+      enabled: true,
+      primaryEndpoint: defaultRpcForCluster(program.cluster),
+      fallbackEndpoints: [],
+      commitmentPromotion: "confirmed",
+      backfillWindowHours: 24,
+    },
+    update: { enabled: true, pausedAt: null },
+  });
+  await publishIngestControl({
+    op: "start",
+    program_id_fk: program.id,
+    cluster: program.cluster,
+  });
+  await writeAuditRow(prisma, {
+    orgId: program.project.orgId,
+    actorUserId: access.appUserId,
+    action: "ingestion.start",
+    targetType: "program",
+    targetId: program.id,
+    metadata: {},
+  });
+  return res.json({ ok: true });
+});
+
+programsRouter.post("/:id/ingestion/stop", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  await prisma.ingestionConfig.upsert({
+    where: { programIdFk: program.id },
+    create: {
+      programIdFk: program.id,
+      cluster: program.cluster,
+      enabled: false,
+      primaryEndpoint: defaultRpcForCluster(program.cluster),
+      fallbackEndpoints: [],
+      commitmentPromotion: "confirmed",
+      backfillWindowHours: 24,
+      pausedAt: new Date(),
+    },
+    update: { enabled: false, pausedAt: new Date() },
+  });
+  await publishIngestControl({
+    op: "stop",
+    program_id_fk: program.id,
+    cluster: program.cluster,
+  });
+  await writeAuditRow(prisma, {
+    orgId: program.project.orgId,
+    actorUserId: access.appUserId,
+    action: "ingestion.stop",
+    targetType: "program",
+    targetId: program.id,
+    metadata: {},
+  });
+  return res.json({ ok: true });
+});
+
+programsRouter.post("/:id/ingestion/backfill", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postBackfillBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  await publishIngestControl({
+    op: "backfill",
+    program_id_fk: program.id,
+    cluster: program.cluster,
+    hours: parsed.data.hours,
+  });
+  await writeAuditRow(prisma, {
+    orgId: program.project.orgId,
+    actorUserId: access.appUserId,
+    action: "ingestion.backfill",
+    targetType: "program",
+    targetId: program.id,
+    metadata: { hours: parsed.data.hours },
+  });
+  return res.json({ ok: true });
+});
+
+programsRouter.get("/:id/ingestion/status", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const [config, state, errors, accounts] = await Promise.all([
+    prisma.ingestionConfig.findUnique({ where: { programIdFk: program.id } }),
+    prisma.ingestionState.findUnique({
+      where: {
+        programIdFk_cluster: {
+          programIdFk: program.id,
+          cluster: program.cluster,
+        },
+      },
+    }),
+    prisma.ingestionError.findMany({
+      where: { programIdFk: program.id },
+      orderBy: { occurredAt: "desc" },
+      take: 10,
+    }),
+    prisma.trackedAccount.findMany({
+      where: { programIdFk: program.id },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  return res.json({ config, state, errors, trackedAccounts: accounts });
+});
+
+programsRouter.post("/:id/accounts", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postAccountBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  try {
+    new PublicKey(parsed.data.account);
+  } catch {
+    return res.status(400).json({ error: "invalid_account" });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const row = await prisma.trackedAccount.create({
+    data: {
+      programIdFk: program.id,
+      cluster: program.cluster,
+      account: parsed.data.account,
+    },
+  });
+  await writeAuditRow(prisma, {
+    orgId: program.project.orgId,
+    actorUserId: access.appUserId,
+    action: "ingestion.account_add",
+    targetType: "tracked_account",
+    targetId: row.id,
+    metadata: { account: row.account },
+  });
+  return res.status(201).json({ id: row.id });
+});
+
+function defaultRpcForCluster(cluster: string): string {
+  if (cluster === "devnet") return "https://api.devnet.solana.com";
+  if (cluster === "testnet") return "https://api.testnet.solana.com";
+  if (cluster === "localnet")
+    return process.env.SOLANA_LOCALNET_RPC || "http://host.docker.internal:8899";
+  return "https://api.mainnet-beta.solana.com";
+}
+
+async function publishIngestControl(msg: {
+  op: string;
+  program_id_fk: string;
+  cluster: string;
+  hours?: number;
+}) {
+  const js = await getJetstream();
+  const payload = {
+    op: msg.op,
+    program_id_fk: msg.program_id_fk,
+    cluster: msg.cluster,
+    hours: msg.hours ?? null,
+  };
+  await js.publish(
+    `ingest.control.${msg.cluster}.${msg.program_id_fk}`,
+    Buffer.from(JSON.stringify(payload)),
+  );
+}

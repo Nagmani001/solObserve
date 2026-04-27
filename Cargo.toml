@@ -5,6 +5,7 @@ members = [
     "services/decoder",
     "services/alerter",
     "services/replay",
+    "crates/solana-rpc-client",
     "crates/solobserve-types",
     "crates/solobserve-storage",
     "crates/solobserve-config",
@@ -32,10 +33,18 @@ clickhouse = { version = "0.13", features = ["rustls-tls"] }
 aws-sdk-s3 = { version = "1.65", default-features = false, features = ["rustls", "rt-tokio"] }
 aws-config = { version = "1.5", default-features = false, features = ["rustls", "rt-tokio"] }
 aws-credential-types = "1.2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio-stream = "0.1"
+futures = "0.3"
+rand = "0.8"
+uuid = { version = "1", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+zstd = "0.13"
 
 solobserve-types = { path = "crates/solobserve-types" }
 solobserve-storage = { path = "crates/solobserve-storage" }
 solobserve-config = { path = "crates/solobserve-config" }
+solana-rpc-client = { path = "crates/solana-rpc-client" }
 
 [profile.release]
 lto = "thin"

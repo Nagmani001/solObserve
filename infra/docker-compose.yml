@@ -1,5 +1,7 @@
 name: solobserve
 
+# localnet note (plan 3): run `solana-test-validator` on host and point
+# SOLANA_LOCALNET_RPC=http://host.docker.internal:8899 and WS=ws://host.docker.internal:8900.
 services:
   postgres:
     image: postgres:16-alpine

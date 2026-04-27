@@ -8,6 +8,7 @@ import {
   TabsTrigger,
 } from "@repo/ui/components/tabs";
 import { EmptyState } from "@/components/empty-state";
+import { IngestionPanel } from "@/components/ingestion-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -54,13 +55,17 @@ export default async function ProgramHomePage({
         </p>
       </div>
 
-      <div className="rounded-lg border bg-muted/20 p-4 text-sm">
-        Data is not flowing yet—ingestion lands in Implementation Plan 3.
-      </div>
+      {program.cluster === "mainnet" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Public mainnet RPC is heavily rate-limited. For high-traffic programs,
+          add free-tier provider endpoints in ingestion settings.
+        </div>
+      )}
 
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
           <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -69,8 +74,11 @@ export default async function ProgramHomePage({
         <TabsContent value="overview" className="mt-6">
           <EmptyState
             title="Telemetry pipeline"
-            description="Once ingest + decode ships in plan 3, this overview will summarize live Anchor instruction volume and CPI trees."
+            description="Ingestion now writes raw tx/account data. Decoder + derived metrics ship in plan 4."
           />
+        </TabsContent>
+        <TabsContent value="ingestion" className="mt-6">
+          <IngestionPanel programId={program.id} />
         </TabsContent>
         <TabsContent value="dashboards" className="mt-6">
           <EmptyState
