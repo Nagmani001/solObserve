@@ -174,6 +174,7 @@ programsRouter.post("/", async (req, res) => {
           uploadedById: access.appUserId,
         },
       });
+      await tx.$executeRaw`SELECT pg_notify('idl_updated', ${program_id})`;
 
       if (auto_enable_ingestion) {
         await tx.ingestionConfig.upsert({
@@ -419,6 +420,7 @@ programsRouter.post("/:id/idl", async (req, res) => {
           uploadedById: access.appUserId,
         },
       });
+      await tx.$executeRaw`SELECT pg_notify('idl_updated', ${program.programId})`;
 
       await writeAuditRow(tx, {
         orgId: program.project.orgId,

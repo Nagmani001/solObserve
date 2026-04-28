@@ -640,6 +640,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "bstr"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -963,15 +972,19 @@ dependencies = [
  "aws-sdk-s3",
  "axum",
  "base64",
+ "bs58",
  "chrono",
  "clickhouse",
  "futures",
+ "hex",
+ "idl-parser",
  "once_cell",
  "prometheus",
  "regex",
  "schema-registry",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "solobserve-config",
  "solobserve-storage",
  "solobserve-types",
@@ -1730,6 +1743,7 @@ checksum = "3d3067d79b975e8844ca9eb072e16b31c3c1c36928edf9c6789548c524d0d954"
 name = "idl-parser"
 version = "0.1.0"
 dependencies = [
+ "bs58",
  "hex",
  "serde",
  "serde-wasm-bindgen",
@@ -1781,10 +1795,12 @@ dependencies = [
  "aws-sdk-s3",
  "chrono",
  "futures",
+ "hex",
  "once_cell",
  "prometheus",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "solana-rpc-client",
  "solobserve-config",
  "solobserve-storage",

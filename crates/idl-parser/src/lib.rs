@@ -1,9 +1,11 @@
 //! Anchor IDL 0.30+ parser: validate, compute discriminators, emit normalized JSON for decoder use.
 
+mod borsh_decode;
 mod discriminator;
 mod error;
 mod model;
 
+pub use borsh_decode::{decode_account_payload, decode_event_payload, decode_instruction_args};
 pub use discriminator::anchor_discriminator;
 pub use error::ParseError;
 pub use model::{

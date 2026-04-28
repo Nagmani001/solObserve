@@ -53,6 +53,7 @@ solobserve-storage = { path = "crates/solobserve-storage" }
 solobserve-config = { path = "crates/solobserve-config" }
 solana-rpc-client = { path = "crates/solana-rpc-client" }
 schema-registry = { path = "crates/schema-registry" }
+idl-parser = { path = "crates/idl-parser" }
 
 [profile.release]
 lto = "thin"

@@ -1,9 +1,11 @@
 use anyhow::Result;
 use async_nats::jetstream::{self, consumer::pull::Config as PullConfig};
 use axum::{response::IntoResponse, routing::get, Router};
+use base64::Engine;
 use chrono::Utc;
 use clickhouse::Row;
 use futures::StreamExt;
+use idl_parser::{decode_account_payload, decode_event_payload, decode_instruction_args};
 use once_cell::sync::Lazy;
 use prometheus::{Encoder, HistogramVec, IntCounterVec, IntGauge, Registry, TextEncoder};
 use regex::Regex;
@@ -189,7 +191,10 @@ async fn main() -> Result<()> {
 
     let registry = SchemaRegistry::new();
     registry.refresh_from_postgres(&pg).await?;
-    registry.clone().start_refresh_loop(pg.clone()).await;
+    registry
+        .clone()
+        .start_listener(pg.clone(), cfg.postgres.url.clone())
+        .await;
 
     let metrics = Metrics::new();
     spawn_metrics_server(metrics.clone());
@@ -376,6 +381,7 @@ async fn decode_tx_message(
         .resolve_for_slot(&raw.program_id, raw.block_time)
         .await;
     let (idl_version, schema_hash) = schema
+        .clone()
         .map(|s| (s.version as u32, s.schema_hash))
         .unwrap_or((0, String::new()));
 
@@ -387,6 +393,8 @@ async fn decode_tx_message(
         .into_iter()
         .filter_map(|v| v.as_str().map(|s| s.to_string()))
         .collect::<Vec<_>>();
+    let account_keys = extract_account_keys(&json);
+    let compiled_ixs = extract_compiled_instructions(&json, &account_keys);
 
     let signer = json
         .pointer("/transaction/message/accountKeys/0")
@@ -439,23 +447,7 @@ async fn decode_tx_message(
                 slot: raw.slot,
                 block_time: block_ts,
             });
-            ix_rows.push(ChInstructionRow {
-                cluster: raw.cluster.clone(),
-                program_id: raw.program_id.clone(),
-                signature: raw.signature.clone(),
-                slot: raw.slot,
-                block_time: block_ts,
-                ix_index: child,
-                parent_ix_index: if parent == 0 { None } else { Some(parent) },
-                depth,
-                instruction_name: parse_instruction_name_from_log(&logs, i)
-                    .unwrap_or_else(|| "__unknown__".to_string()),
-                args_json: "{}".to_string(),
-                args_raw_hex: String::new(),
-                decode_error: None,
-                status: "seen".to_string(),
-                idl_version,
-            });
+            let _ = i;
             continue;
         }
         if let Some(cap) = CU_RE.captures(line) {
@@ -471,6 +463,23 @@ async fn decode_tx_message(
             continue;
         }
         if let Some(payload) = line.strip_prefix("Program data: ") {
+            let mut event_name = "__raw__".to_string();
+            let mut payload_json = "{}".to_string();
+            if let Ok(ev_bytes) = base64::engine::general_purpose::STANDARD.decode(payload) {
+                if ev_bytes.len() >= 8 {
+                    if let Some(schema_ref) = schema.as_ref() {
+                        if let Ok((n, p)) = decode_event_payload(
+                            &schema_ref.parsed_json,
+                            &ev_bytes[..8],
+                            &ev_bytes[8..],
+                        ) {
+                            event_name = n;
+                            payload_json =
+                                serde_json::to_string(&p).unwrap_or_else(|_| "{}".to_string());
+                        }
+                    }
+                }
+            }
             event_rows.push(ChEventRow {
                 cluster: raw.cluster.clone(),
                 program_id: raw.program_id.clone(),
@@ -480,8 +489,8 @@ async fn decode_tx_message(
                 event_index: event_rows.len() as u16,
                 ix_index: invoke_stack.last().map(|x| x.0).unwrap_or(0),
                 source: "anchor".to_string(),
-                event_name: "__raw__".to_string(),
-                payload_json: "{}".to_string(),
+                event_name,
+                payload_json,
                 raw_payload: payload.to_string(),
                 idl_version,
             });
@@ -505,28 +514,84 @@ async fn decode_tx_message(
             continue;
         }
     }
-    if ix_rows.is_empty() {
-        metrics
-            .unknown_disc
-            .with_label_values(&[raw.program_id.as_str()])
-            .inc();
+
+    for ix in &compiled_ixs {
+        if ix.program_id != raw.program_id {
+            continue;
+        }
+        let mut instruction_name = "__unknown__".to_string();
+        let mut args_json = "null".to_string();
+        let mut decode_error = Some("unrecognized discriminator".to_string());
+        let args_raw_hex = hex::encode(&ix.data);
+
+        if ix.data.len() >= 8 {
+            if let Some(schema_ref) = schema.as_ref() {
+                match decode_instruction_args(&schema_ref.parsed_json, &ix.data[..8], &ix.data[8..])
+                {
+                    Ok((name, args)) => {
+                        instruction_name = name;
+                        args_json =
+                            serde_json::to_string(&args).unwrap_or_else(|_| "null".to_string());
+                        decode_error = None;
+                    }
+                    Err(e) => {
+                        if e == "unrecognized discriminator" {
+                            metrics
+                                .unknown_disc
+                                .with_label_values(&[raw.program_id.as_str()])
+                                .inc();
+                        } else {
+                            metrics
+                                .decode_failures
+                                .with_label_values(&[raw.program_id.as_str()])
+                                .inc();
+                        }
+                        decode_error = Some(e);
+                    }
+                }
+            }
+        } else {
+            metrics
+                .unknown_disc
+                .with_label_values(&[raw.program_id.as_str()])
+                .inc();
+        }
+
         ix_rows.push(ChInstructionRow {
             cluster: raw.cluster.clone(),
             program_id: raw.program_id.clone(),
             signature: raw.signature.clone(),
             slot: raw.slot,
             block_time: block_ts,
-            ix_index: 0,
-            parent_ix_index: None,
-            depth: 1,
-            instruction_name: "__unknown__".to_string(),
-            args_json: "null".to_string(),
-            args_raw_hex: String::new(),
-            decode_error: Some("unrecognized discriminator".to_string()),
+            ix_index: ix.ix_index,
+            parent_ix_index: ix.parent_ix_index,
+            depth: ix.depth,
+            instruction_name,
+            args_json,
+            args_raw_hex,
+            decode_error,
             status: status.clone(),
             idl_version,
         });
     }
+    if ix_rows.is_empty() {
+        metrics
+            .unknown_disc
+            .with_label_values(&[raw.program_id.as_str()])
+            .inc();
+    }
+
+    let (error_code, error_name) = parse_meta_error(
+        json.pointer("/meta/err"),
+        schema.as_ref().map(|s| &s.parsed_json),
+    );
+    let compute_budget_consumed = json
+        .pointer("/meta/computeUnitsConsumed")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32)
+        .unwrap_or_else(|| edges.iter().map(|e| e.cu_consumed).sum());
+    let priority_fee_lamports =
+        extract_priority_fee_lamports(&compiled_ixs, compute_budget_consumed);
 
     let tx_row = ChTxRow {
         cluster: raw.cluster.clone(),
@@ -537,12 +602,16 @@ async fn decode_tx_message(
         status: status.clone(),
         signer,
         fee_lamports: fee,
-        priority_fee_lamports: 0,
-        compute_budget_consumed: edges.iter().map(|e| e.cu_consumed).sum(),
-        error_code: None,
-        error_name: parse_error_name(&logs),
+        priority_fee_lamports,
+        compute_budget_consumed,
+        error_code,
+        error_name,
         commitment: raw.commitment.clone(),
-        rpc_source: "default".to_string(),
+        rpc_source: if raw.rpc_source.is_empty() {
+            "unknown".to_string()
+        } else {
+            raw.rpc_source.clone()
+        },
         idl_version,
         schema_hash,
         raw_blob_url: raw.raw_blob_url.clone(),
@@ -582,16 +651,180 @@ fn parse_instruction_name_from_log(logs: &[String], invoke_index: usize) -> Opti
     None
 }
 
-fn parse_error_name(logs: &[String]) -> Option<String> {
-    for l in logs {
-        if l.contains("ComputeBudgetExceeded") {
-            return Some("ComputeBudgetExceeded".to_string());
-        }
-        if l.contains("ArithmeticOverflow") {
-            return Some("ArithmeticOverflow".to_string());
+#[derive(Debug, Clone)]
+struct CompiledIx {
+    program_id: String,
+    data: Vec<u8>,
+    ix_index: u16,
+    parent_ix_index: Option<u16>,
+    depth: u8,
+}
+
+fn extract_account_keys(json: &Value) -> Vec<String> {
+    json.pointer("/transaction/message/accountKeys")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| {
+            if let Some(s) = v.as_str() {
+                Some(s.to_string())
+            } else {
+                v.get("pubkey")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string())
+            }
+        })
+        .collect()
+}
+
+fn decode_ix_data(data: &str) -> Vec<u8> {
+    bs58::decode(data).into_vec().unwrap_or_default()
+}
+
+fn extract_compiled_instructions(json: &Value, account_keys: &[String]) -> Vec<CompiledIx> {
+    let mut out = Vec::new();
+    let top = json
+        .pointer("/transaction/message/instructions")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    for (i, ix) in top.into_iter().enumerate() {
+        let program_id = ix
+            .get("programId")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                ix.get("programIdIndex")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|idx| account_keys.get(idx as usize).cloned())
+            })
+            .unwrap_or_default();
+        let data = ix
+            .get("data")
+            .and_then(|v| v.as_str())
+            .map(decode_ix_data)
+            .unwrap_or_default();
+        out.push(CompiledIx {
+            program_id,
+            data,
+            ix_index: i as u16,
+            parent_ix_index: None,
+            depth: 1,
+        });
+    }
+    let inner = json
+        .pointer("/meta/innerInstructions")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut next_idx = 1000u16;
+    for group in inner {
+        let parent = group
+            .get("index")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u16);
+        for ix in group
+            .get("instructions")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default()
+        {
+            let program_id = ix
+                .get("programId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    ix.get("programIdIndex")
+                        .and_then(|v| v.as_u64())
+                        .and_then(|idx| account_keys.get(idx as usize).cloned())
+                })
+                .unwrap_or_default();
+            let data = ix
+                .get("data")
+                .and_then(|v| v.as_str())
+                .map(decode_ix_data)
+                .unwrap_or_default();
+            out.push(CompiledIx {
+                program_id,
+                data,
+                ix_index: next_idx,
+                parent_ix_index: parent,
+                depth: 2,
+            });
+            next_idx = next_idx.saturating_add(1);
         }
     }
-    None
+    out
+}
+
+fn parse_meta_error(
+    meta_err: Option<&Value>,
+    parsed_idl: Option<&Value>,
+) -> (Option<i32>, Option<String>) {
+    let err = match meta_err {
+        Some(v) if !v.is_null() => v,
+        _ => return (None, None),
+    };
+    if let Some(obj) = err.as_object() {
+        if let Some(ix_err) = obj.get("InstructionError").and_then(|v| v.as_array()) {
+            if ix_err.len() >= 2 {
+                if let Some(custom) = ix_err[1].get("Custom").and_then(|v| v.as_i64()) {
+                    if let Some(idl) = parsed_idl {
+                        if let Some(errors) = idl.get("errors").and_then(|v| v.as_array()) {
+                            for e in errors {
+                                if e.get("code").and_then(|x| x.as_i64()) == Some(custom) {
+                                    return (
+                                        Some(custom as i32),
+                                        e.get("name")
+                                            .and_then(|x| x.as_str())
+                                            .map(|s| s.to_string()),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    return (Some(custom as i32), Some(format!("Custom({custom})")));
+                }
+                if let Some(builtin) = ix_err[1].as_str() {
+                    return (None, Some(builtin.to_string()));
+                }
+            }
+        }
+        for key in [
+            "ComputeBudgetExceeded",
+            "ArithmeticOverflow",
+            "AccountConstraintMut",
+            "AccountConstraintSeeds",
+            "InsufficientFundsForRent",
+            "AccountNotFound",
+        ] {
+            if obj.contains_key(key) {
+                return (None, Some(key.to_string()));
+            }
+        }
+    }
+    if let Some(s) = err.as_str() {
+        return (None, Some(s.to_string()));
+    }
+    (None, Some("UnknownError".to_string()))
+}
+
+fn extract_priority_fee_lamports(ixs: &[CompiledIx], compute_units_consumed: u32) -> u64 {
+    const COMPUTE_BUDGET_PROGRAM: &str = "ComputeBudget111111111111111111111111111111";
+    for ix in ixs {
+        if ix.program_id != COMPUTE_BUDGET_PROGRAM || ix.data.len() < 9 {
+            continue;
+        }
+        // SetComputeUnitPrice: tag 0x03 + u64 micro-lamports/CU.
+        if ix.data[0] == 0x03 {
+            let mut b = [0u8; 8];
+            b.copy_from_slice(&ix.data[1..9]);
+            let micro_lamports_per_cu = u64::from_le_bytes(b);
+            return micro_lamports_per_cu.saturating_mul(compute_units_consumed as u64) / 1_000_000;
+        }
+    }
+    0
 }
 
 async fn run_account_loop(
@@ -656,6 +889,30 @@ async fn decode_account_message(
     let json: Value = serde_json::from_slice(&decoded)?;
     let schema = registry.resolve_for_slot(&raw.program_id, None).await;
     let idl_version = schema.as_ref().map(|s| s.version as u32).unwrap_or(0);
+    let mut account_type = None::<String>;
+    let mut decoded_payload = json.clone();
+    if let Some(data_b64) = json
+        .get("value")
+        .and_then(|v| v.get("data"))
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|v| v.as_str())
+    {
+        if let Ok(acc_bytes) = base64::engine::general_purpose::STANDARD.decode(data_b64) {
+            if acc_bytes.len() >= 8 {
+                if let Some(schema_ref) = schema.as_ref() {
+                    if let Ok((name, payload)) = decode_account_payload(
+                        &schema_ref.parsed_json,
+                        &acc_bytes[..8],
+                        &acc_bytes[8..],
+                    ) {
+                        account_type = Some(name);
+                        decoded_payload = payload;
+                    }
+                }
+            }
+        }
+    }
 
     let row = AccountWriteRow {
         cluster: raw.cluster.clone(),
@@ -664,8 +921,8 @@ async fn decode_account_message(
         signature: String::new(),
         slot: raw.slot,
         block_time: Utc::now().timestamp() as u32,
-        account_type: None,
-        decoded_json: serde_json::to_string(&json)?,
+        account_type: account_type.clone(),
+        decoded_json: serde_json::to_string(&decoded_payload)?,
         raw_blob_url: raw.raw_blob_url.clone(),
         commitment: raw.commitment.clone(),
         idl_version,
@@ -694,8 +951,8 @@ async fn decode_account_message(
         .bind(&raw.account)
         .bind(program_fk)
         .bind(&raw.cluster)
-        .bind::<Option<String>>(None)
-        .bind(serde_json::to_string(&json)?)
+        .bind(account_type.clone())
+        .bind(serde_json::to_string(&decoded_payload)?)
         .bind(raw.slot as i64)
         .execute(pg)
         .await?;
@@ -710,8 +967,8 @@ async fn decode_account_message(
         .bind(program_fk)
         .bind(&raw.cluster)
         .bind(raw.slot as i64)
-        .bind::<Option<String>>(None)
-        .bind(serde_json::to_string(&json)?)
+        .bind(account_type)
+        .bind(serde_json::to_string(&decoded_payload)?)
         .execute(pg)
         .await?;
     }

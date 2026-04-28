@@ -61,6 +61,42 @@ impl SchemaRegistry {
         Ok(())
     }
 
+    pub async fn refresh_program_from_postgres(&self, pg: &PgPool, program_id: &str) -> Result<()> {
+        let rows = sqlx::query(
+            r#"
+            SELECT p.program_id, i.version, i.parsed_json, EXTRACT(EPOCH FROM i.created_at)::bigint as created_unix
+            FROM idls i
+            JOIN programs p ON p.id = i.program_id_fk
+            WHERE p.program_id = $1
+            ORDER BY i.version
+            "#,
+        )
+        .bind(program_id)
+        .fetch_all(pg)
+        .await?;
+
+        let mut versions = Vec::new();
+        for row in rows {
+            let parsed_json: Value = row.try_get("parsed_json")?;
+            let schema_hash = {
+                let mut h = Sha256::new();
+                h.update(serde_json::to_vec(&parsed_json)?);
+                format!("{:x}", h.finalize())
+            };
+            versions.push(ProgramSchemaVersion {
+                version: row.try_get("version")?,
+                parsed_json,
+                created_at_unix: row.try_get("created_unix")?,
+                schema_hash,
+            });
+        }
+        self.inner
+            .write()
+            .await
+            .insert(program_id.to_string(), versions);
+        Ok(())
+    }
+
     pub async fn resolve_for_slot(
         &self,
         program_id: &str,
@@ -84,13 +120,42 @@ impl SchemaRegistry {
         versions.last().cloned()
     }
 
-    pub async fn start_refresh_loop(self, pg: PgPool) {
+    pub async fn start_listener(self, pg: PgPool, pg_url: String) {
         tokio::spawn(async move {
-            loop {
-                if let Err(e) = self.refresh_from_postgres(&pg).await {
-                    warn!(error = ?e, "schema registry refresh failed");
+            let mut listener = match sqlx::postgres::PgListener::connect(&pg_url).await {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(error = ?e, "schema registry LISTEN connect failed; fallback refresh loop");
+                    loop {
+                        if let Err(e) = self.refresh_from_postgres(&pg).await {
+                            warn!(error = ?e, "schema registry refresh failed");
+                        }
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    }
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            };
+            if let Err(e) = listener.listen("idl_updated").await {
+                warn!(error = ?e, "schema registry LISTEN subscribe failed");
+            }
+            loop {
+                match listener.recv().await {
+                    Ok(note) => {
+                        let payload = note.payload().trim().to_string();
+                        if payload.is_empty() {
+                            if let Err(e) = self.refresh_from_postgres(&pg).await {
+                                warn!(error = ?e, "schema registry full refresh failed");
+                            }
+                        } else if let Err(e) =
+                            self.refresh_program_from_postgres(&pg, &payload).await
+                        {
+                            warn!(error = ?e, program_id = %payload, "schema registry targeted refresh failed");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(error = ?e, "schema registry LISTEN recv failed");
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    }
+                }
             }
         });
     }

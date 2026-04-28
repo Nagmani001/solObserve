@@ -24,5 +24,7 @@ futures.workspace = true
 tokio-stream.workspace = true
 zstd.workspace = true
 sqlx.workspace = true
+sha2.workspace = true
+hex = "0.4"
 prometheus.workspace = true
 once_cell.workspace = true

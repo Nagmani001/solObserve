@@ -29,3 +29,7 @@ sqlx.workspace = true
 zstd.workspace = true
 uuid.workspace = true
 futures.workspace = true
+idl-parser.workspace = true
+bs58 = "0.5"
+hex = "0.4"
+sha2.workspace = true

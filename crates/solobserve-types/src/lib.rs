@@ -11,6 +11,8 @@ pub struct RawTxMsg {
     pub raw_blob_url: String,
     pub fetched_at: i64,
     #[serde(default)]
+    pub rpc_source: String,
+    #[serde(default)]
     pub backfill: bool,
     #[serde(default)]
     pub rollback: bool,
@@ -50,6 +52,7 @@ mod tests {
             commitment: "processed".to_string(),
             raw_blob_url: "s3://bucket/raw".to_string(),
             fetched_at: 999,
+            rpc_source: "src".to_string(),
             backfill: false,
             rollback: false,
         };

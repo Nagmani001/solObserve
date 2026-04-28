@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use async_nats::jetstream::stream::Config as StreamConfig;
 use async_nats::jetstream::{self};
 use chrono::Utc;
+use sha2::{Digest, Sha256};
 use solana_rpc_client::{RpcEndpoint, SolanaRpcClient};
 use solobserve_config::Config;
 use solobserve_storage::{nats_jetstream, pg_pool, s3_client};
@@ -334,6 +335,7 @@ async fn ingest_signature(
     slot: u64,
     backfill: bool,
 ) -> Result<()> {
+    let mut rpc_source = String::new();
     let blob_key = format!(
         "raw/{}/{}/{}/{}.json.zst",
         cfg.cluster, cfg.program_id, slot, signature
@@ -346,7 +348,10 @@ async fn ingest_signature(
         .await
         .is_ok();
     if !exists {
-        let raw = rpc.get_transaction(signature, "processed").await?;
+        let (raw, source_ep) = rpc
+            .get_transaction_with_source(signature, "processed")
+            .await?;
+        rpc_source = short_hash(&source_ep);
         let data = serde_json::to_vec(&raw)?;
         let compressed = zstd::stream::encode_all(std::io::Cursor::new(data), 1)?;
         s3.put_object()
@@ -367,6 +372,7 @@ async fn ingest_signature(
         commitment: "processed".to_string(),
         raw_blob_url: format!("s3://{}/{}", bucket, blob_key),
         fetched_at: Utc::now().timestamp(),
+        rpc_source,
         backfill,
         rollback: false,
     };
@@ -434,6 +440,7 @@ async fn promote_or_rollback(
                     commitment: "confirmed".to_string(),
                     raw_blob_url: String::new(),
                     fetched_at: Utc::now().timestamp(),
+                    rpc_source: String::new(),
                     backfill: false,
                     rollback: false,
                 };
@@ -456,6 +463,7 @@ async fn promote_or_rollback(
                 commitment: "processed".to_string(),
                 raw_blob_url: String::new(),
                 fetched_at: Utc::now().timestamp(),
+                rpc_source: String::new(),
                 backfill: false,
                 rollback: true,
             };
@@ -478,6 +486,13 @@ async fn promote_or_rollback(
         }
     }
     Ok(())
+}
+
+fn short_hash(input: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(input.as_bytes());
+    let out = h.finalize();
+    hex::encode(&out[..4])
 }
 
 async fn record_error(

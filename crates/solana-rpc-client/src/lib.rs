@@ -172,7 +172,7 @@ impl SolanaRpcClient {
             .collect()
     }
 
-    async fn rpc_call(&self, method: &str, params: Value) -> Result<Value> {
+    async fn rpc_call_with_source(&self, method: &str, params: Value) -> Result<(Value, String)> {
         let mut retries = 0u32;
         let mut delay = Duration::from_millis(200);
         loop {
@@ -227,7 +227,7 @@ impl SolanaRpcClient {
                     }
                     self.record_result(&ep.http_url, true, started.elapsed())
                         .await;
-                    return Ok(parsed["result"].clone());
+                    return Ok((parsed["result"].clone(), ep.http_url.clone()));
                 }
                 Err(e) => {
                     self.record_result(&ep.http_url, false, started.elapsed())
@@ -245,8 +245,32 @@ impl SolanaRpcClient {
         }
     }
 
+    async fn rpc_call(&self, method: &str, params: Value) -> Result<Value> {
+        let (v, _) = self.rpc_call_with_source(method, params).await?;
+        Ok(v)
+    }
+
     pub async fn get_transaction(&self, signature: &str, commitment: &str) -> Result<Value> {
         self.rpc_call(
+            "getTransaction",
+            json!([
+                signature,
+                {
+                    "encoding": "json",
+                    "commitment": commitment,
+                    "maxSupportedTransactionVersion": 0
+                }
+            ]),
+        )
+        .await
+    }
+
+    pub async fn get_transaction_with_source(
+        &self,
+        signature: &str,
+        commitment: &str,
+    ) -> Result<(Value, String)> {
+        self.rpc_call_with_source(
             "getTransaction",
             json!([
                 signature,
