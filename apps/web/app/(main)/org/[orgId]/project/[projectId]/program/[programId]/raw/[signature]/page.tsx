@@ -15,11 +15,15 @@ export default async function RawDetailPage({
   const { orgId, projectId, programId, signature } = await params;
   const gate = await requireOrgRole(orgId, "admin");
   if (gate.forbidden) {
-    return <p className="text-sm text-muted-foreground">Admin access required.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Admin access required.</p>
+    );
   }
   const data = await getRawStreamDetail(programId, signature);
   if ("error" in data) {
-    return <p className="text-sm text-muted-foreground">{String(data.error)}</p>;
+    return (
+      <p className="text-sm text-muted-foreground">{String(data.error)}</p>
+    );
   }
   const tx = data.tx as Record<string, unknown> | null;
   const instructions = (data.instructions as Record<string, unknown>[]) || [];
@@ -34,7 +38,9 @@ export default async function RawDetailPage({
       >
         Back to program
       </Link>
-      <h1 className="text-xl font-semibold tracking-tight">Raw Stream Detail</h1>
+      <h1 className="text-xl font-semibold tracking-tight">
+        Raw Stream Detail
+      </h1>
       <p className="font-mono text-xs">{signature}</p>
 
       <section className="rounded-lg border p-4">

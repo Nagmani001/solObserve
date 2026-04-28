@@ -661,7 +661,10 @@ programsRouter.get("/:id/raw-stream", async (req, res) => {
       ORDER BY t.slot DESC
       LIMIT {limit:UInt32}
     `,
-    params: { program_id: program.programId, limit: Math.max(1, Math.min(limit, 100)) },
+    params: {
+      program_id: program.programId,
+      limit: Math.max(1, Math.min(limit, 100)),
+    },
   });
   return res.json({ rows });
 });

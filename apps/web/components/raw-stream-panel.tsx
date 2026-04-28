@@ -78,9 +78,13 @@ export function RawStreamPanel({
                     {r.signature.slice(0, 10)}...
                   </Link>
                 </td>
-                <td className="px-3 py-2">{(r.instructions || []).join(", ")}</td>
+                <td className="px-3 py-2">
+                  {(r.instructions || []).join(", ")}
+                </td>
                 <td className="px-3 py-2">{r.status}</td>
-                <td className="px-3 py-2 font-mono">{r.signer.slice(0, 8)}...</td>
+                <td className="px-3 py-2 font-mono">
+                  {r.signer.slice(0, 8)}...
+                </td>
                 <td className="px-3 py-2">{r.fee_lamports}</td>
                 <td className="px-3 py-2">{r.error_name || "—"}</td>
               </tr>
