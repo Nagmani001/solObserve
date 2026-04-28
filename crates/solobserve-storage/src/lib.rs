@@ -4,6 +4,7 @@ use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use solobserve_config::Config;
 use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::path::Path;
 
 /// Apply sqlx migrations bundled with this crate (must run before Prisma app uses new tables).
 pub async fn run_pg_migrations(pool: &PgPool) -> Result<()> {
@@ -31,6 +32,65 @@ pub fn clickhouse_client(cfg: &Config) -> clickhouse::Client {
         c = c.with_password(&cfg.clickhouse.password);
     }
     c
+}
+
+/// Apply ClickHouse SQL migrations from `clickhouse-migrations/`.
+pub async fn run_clickhouse_migrations(client: &clickhouse::Client) -> Result<()> {
+    client
+        .query(
+            "CREATE TABLE IF NOT EXISTS _migrations (version String, applied_at DateTime DEFAULT now()) ENGINE=MergeTree ORDER BY (version)",
+        )
+        .execute()
+        .await
+        .context("create clickhouse _migrations table")?;
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("clickhouse-migrations");
+    let mut entries: Vec<_> = std::fs::read_dir(&root)
+        .context("read clickhouse migration directory")?
+        .flatten()
+        .filter(|e| {
+            e.path()
+                .extension()
+                .and_then(|x| x.to_str())
+                .map(|x| x.eq_ignore_ascii_case("sql"))
+                .unwrap_or(false)
+        })
+        .collect();
+    entries.sort_by_key(|e| e.file_name());
+
+    #[derive(clickhouse::Row, serde::Deserialize)]
+    struct M {
+        version: String,
+    }
+    let applied: Vec<M> = client
+        .query("SELECT version FROM _migrations")
+        .fetch_all()
+        .await
+        .unwrap_or_default();
+    let applied_set: std::collections::HashSet<String> =
+        applied.into_iter().map(|m| m.version).collect();
+
+    for e in entries {
+        let version = e.file_name().to_string_lossy().to_string();
+        if applied_set.contains(&version) {
+            continue;
+        }
+        let sql = std::fs::read_to_string(e.path()).context("read clickhouse sql file")?;
+        for stmt in sql.split(';').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            client
+                .query(stmt)
+                .execute()
+                .await
+                .with_context(|| format!("apply clickhouse migration statement in {}", version))?;
+        }
+        client
+            .query("INSERT INTO _migrations (version) VALUES (?)")
+            .bind(version)
+            .execute()
+            .await
+            .context("record clickhouse migration version")?;
+    }
+    Ok(())
 }
 
 pub async fn s3_client(cfg: &Config) -> aws_sdk_s3::Client {

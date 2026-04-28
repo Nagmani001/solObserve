@@ -13,7 +13,11 @@ pub static TX_FETCHED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 pub static TX_FAILED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("ingestor_tx_failed_total", "Total transaction fetch failures").unwrap()
+    register_int_counter!(
+        "ingestor_tx_failed_total",
+        "Total transaction fetch failures"
+    )
+    .unwrap()
 });
 
 pub static REORGS_DETECTED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
@@ -121,4 +125,3 @@ pub fn touch() {
     Lazy::force(&ENDPOINT_ERRORS_TOTAL);
     Lazy::force(&ENDPOINT_CALLS_TOTAL);
 }
-

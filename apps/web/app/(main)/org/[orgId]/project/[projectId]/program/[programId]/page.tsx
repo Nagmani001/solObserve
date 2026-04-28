@@ -9,6 +9,7 @@ import {
 } from "@repo/ui/components/tabs";
 import { EmptyState } from "@/components/empty-state";
 import { IngestionPanel } from "@/components/ingestion-panel";
+import { RawStreamPanel } from "@/components/raw-stream-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -16,7 +17,7 @@ export default async function ProgramHomePage({
   params: Promise<{ orgId: string; projectId: string; programId: string }>;
 }) {
   const { orgId, projectId, programId } = await params;
-  await requireOrgRole(orgId, "viewer");
+  const gate = await requireOrgRole(orgId, "viewer");
 
   const program = await prisma.solanaProgram.findFirst({
     where: {
@@ -66,6 +67,9 @@ export default async function ProgramHomePage({
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
+          {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
+            <TabsTrigger value="raw">Raw Stream</TabsTrigger>
+          )}
           <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -80,6 +84,15 @@ export default async function ProgramHomePage({
         <TabsContent value="ingestion" className="mt-6">
           <IngestionPanel programId={program.id} />
         </TabsContent>
+        {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
+          <TabsContent value="raw" className="mt-6">
+            <RawStreamPanel
+              programId={program.id}
+              orgId={orgId}
+              projectId={projectId}
+            />
+          </TabsContent>
+        )}
         <TabsContent value="dashboards" className="mt-6">
           <EmptyState
             title="Dashboards"

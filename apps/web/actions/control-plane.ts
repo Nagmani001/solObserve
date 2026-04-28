@@ -274,3 +274,23 @@ export async function addTrackedAccount(programId: string, account: string) {
   });
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function getRawStream(programId: string, limit = 25) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/raw-stream?limit=${limit}`,
+    {
+      method: "GET",
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getRawStreamDetail(programId: string, signature: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/raw-stream/${signature}`,
+    {
+      method: "GET",
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}

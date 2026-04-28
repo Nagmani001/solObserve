@@ -7,6 +7,7 @@ import { writeAuditRow } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
 import type { SolobserveAuth } from "../middlewares/solobserveAuth.js";
 import { getJetstream } from "../lib/nats.js";
+import { clickhouseQuery } from "../lib/clickhouse.js";
 
 const roleRank = {
   viewer: 0,
@@ -633,6 +634,90 @@ programsRouter.post("/:id/accounts", async (req, res) => {
     metadata: { account: row.account },
   });
   return res.status(201).json({ id: row.id });
+});
+
+programsRouter.get("/:id/raw-stream", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const limit = Number(req.query.limit ?? 25);
+  const rows = await clickhouseQuery({
+    sql: `
+      SELECT t.slot, t.block_time, t.signature, t.status, t.signer, t.fee_lamports, t.error_name,
+             groupArray(i.instruction_name) AS instructions
+      FROM transactions t
+      LEFT JOIN instructions i
+        ON i.signature = t.signature
+       AND i.program_id = t.program_id
+      WHERE t.program_id = {program_id:String}
+        AND t.signature NOT IN (SELECT signature FROM rollbacks)
+      GROUP BY t.slot, t.block_time, t.signature, t.status, t.signer, t.fee_lamports, t.error_name
+      ORDER BY t.slot DESC
+      LIMIT {limit:UInt32}
+    `,
+    params: { program_id: program.programId, limit: Math.max(1, Math.min(limit, 100)) },
+  });
+  return res.json({ rows });
+});
+
+programsRouter.get("/:id/raw-stream/:signature", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const sig = req.params.signature;
+  const [tx, ix, ev, cpi] = await Promise.all([
+    clickhouseQuery({
+      sql: `
+        SELECT * FROM transactions
+        WHERE program_id = {program_id:String} AND signature = {signature:String}
+        ORDER BY slot DESC
+        LIMIT 1
+      `,
+      params: { program_id: program.programId, signature: sig },
+    }),
+    clickhouseQuery({
+      sql: `
+        SELECT * FROM instructions
+        WHERE program_id = {program_id:String} AND signature = {signature:String}
+        ORDER BY ix_index, depth
+      `,
+      params: { program_id: program.programId, signature: sig },
+    }),
+    clickhouseQuery({
+      sql: `
+        SELECT * FROM events
+        WHERE program_id = {program_id:String} AND signature = {signature:String}
+        ORDER BY event_index
+      `,
+      params: { program_id: program.programId, signature: sig },
+    }),
+    clickhouseQuery({
+      sql: `
+        SELECT * FROM cpi_edges
+        WHERE program_id = {program_id:String} AND signature = {signature:String}
+        ORDER BY parent_ix_index, child_ix_index
+      `,
+      params: { program_id: program.programId, signature: sig },
+    }),
+  ]);
+  return res.json({
+    tx: tx[0] ?? null,
+    instructions: ix,
+    events: ev,
+    cpi_edges: cpi,
+  });
 });
 
 function defaultRpcForCluster(cluster: string): string {

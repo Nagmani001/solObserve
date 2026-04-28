@@ -9,6 +9,10 @@ publish.workspace = true
 name = "solobserve-migrate"
 path = "src/bin/migrate.rs"
 
+[[bin]]
+name = "solobserve-clickhouse-migrate"
+path = "src/bin/clickhouse_migrate.rs"
+
 [dependencies]
 anyhow.workspace = true
 async-nats.workspace = true
@@ -21,5 +25,6 @@ sqlx.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+serde.workspace = true
 
 dotenvy.workspace = true
