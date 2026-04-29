@@ -23,9 +23,15 @@ importers:
 
   apps/backend:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.55.0
+        version: 0.55.1
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/dsl-wasm':
+        specifier: workspace:*
+        version: link:../../packages/dsl-wasm
       '@repo/email':
         specifier: workspace:*
         version: link:../../packages/email
@@ -211,6 +217,8 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/dsl-wasm: {}
+
   packages/email:
     dependencies:
       '@react-email/components':
@@ -348,6 +356,10 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
+
+  '@anthropic-ai/sdk@0.55.1':
+    resolution: {integrity: sha512-gjOMS4chmm8BxClKmCjNHmvf1FrO1Cn++CSX6K3YCZjz5JG4I9ZttQ/xEH4FBsz6HQyZvnUpiKlOAkmxaGmEaQ==}
+    hasBin: true
 
   '@babel/runtime@7.29.2':
     resolution: {integrity: sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==}
@@ -4650,6 +4662,8 @@ packages:
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
+
+  '@anthropic-ai/sdk@0.55.1': {}
 
   '@babel/runtime@7.29.2': {}
 

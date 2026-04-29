@@ -661,17 +661,27 @@ programsRouter.post("/:id/query", async (req, res) => {
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
   const parsed = postQueryBody.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
   }
   const program = await prisma.solanaProgram.findUnique({
     where: { id: req.params.id },
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
 
-  const stepMs = parseStepMs(parsed.data.step, parsed.data.from, parsed.data.to);
+  const stepMs = parseStepMs(
+    parsed.data.step,
+    parsed.data.from,
+    parsed.data.to,
+  );
   let compiled: {
     sql: string;
     params: Record<string, unknown>;
@@ -708,7 +718,9 @@ programsRouter.post("/:id/query/raw_sql", async (req, res) => {
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
   const parsed = postRawSqlBody.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
   }
   const program = await prisma.solanaProgram.findUnique({
     where: { id: req.params.id },
@@ -741,7 +753,11 @@ programsRouter.get("/:id/metrics/catalog", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
 
   const latestIdl = await prisma.idl.findFirst({
@@ -786,7 +802,11 @@ programsRouter.post("/:id/query/nl", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -933,7 +953,11 @@ function defaultRpcForCluster(cluster: string): string {
   return "https://api.mainnet-beta.solana.com";
 }
 
-function parseStepMs(step: string | undefined, from: number, to: number): number {
+function parseStepMs(
+  step: string | undefined,
+  from: number,
+  to: number,
+): number {
   if (!step) {
     const windowMs = Math.max(1, to - from);
     if (windowMs <= 60 * 60 * 1000) return 30_000;
@@ -1010,7 +1034,9 @@ function shapeQueryResult(
 
 function arrayField(v: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(v)) return [];
-  return v.filter((x): x is Record<string, unknown> => Boolean(x && typeof x === "object"));
+  return v.filter((x): x is Record<string, unknown> =>
+    Boolean(x && typeof x === "object"),
+  );
 }
 
 async function publishIngestControl(msg: {
