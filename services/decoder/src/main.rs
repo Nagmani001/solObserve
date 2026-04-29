@@ -315,8 +315,10 @@ async fn run_tx_loop(
                 }
             };
             if raw.rollback {
-                ch.query("INSERT INTO rollbacks (signature) VALUES (?)")
+                ch.query("INSERT INTO rollbacks (signature, cluster, program_id) VALUES (?, ?, ?)")
                     .bind(raw.signature.clone())
+                    .bind(raw.cluster.clone())
+                    .bind(raw.program_id.clone())
                     .execute()
                     .await
                     .ok();
@@ -324,9 +326,13 @@ async fn run_tx_loop(
                 continue;
             }
             if raw.commitment == "confirmed" {
-                ch.query("INSERT INTO commitment_promotions (signature, commitment) VALUES (?, ?)")
+                ch.query("INSERT INTO commitment_promotions (signature, commitment, cluster, program_id, slot, observed_at_ms) VALUES (?, ?, ?, ?, ?, ?)")
                     .bind(raw.signature.clone())
                     .bind("confirmed")
+                    .bind(raw.cluster.clone())
+                    .bind(raw.program_id.clone())
+                    .bind(raw.slot)
+                    .bind(Utc::now().timestamp_millis())
                     .execute()
                     .await
                     .ok();

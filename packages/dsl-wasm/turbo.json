@@ -1,0 +1,8 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "outputs": ["pkg/**", "wrapper.js", "wrapper.d.ts"]
+    }
+  }
+}

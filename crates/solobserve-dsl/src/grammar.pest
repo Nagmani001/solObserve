@@ -1,0 +1,19 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+ident = @{ (ASCII_ALPHANUMERIC | "_" | ":" | ".")+ }
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+string = @{ "\"" ~ ( "\\\"" | (!"\"" ~ ANY) )* ~ "\"" }
+duration = @{ ASCII_DIGIT+ ~ ("s" | "m" | "h" | "d") }
+label_op = { "=~" | "!~" | "=" | "!=" }
+label_match = { ident ~ label_op ~ (string | ident) }
+selector = { "{" ~ (label_match ~ ("," ~ label_match)*)? ~ "}" }
+range = { "[" ~ duration ~ "]" }
+vector = { ident ~ selector? ~ range? }
+func = { ident ~ "(" ~ args? ~ ")" }
+args = { expr ~ ("," ~ expr)* }
+grouping = { ("by" | "without") ~ "(" ~ ident ~ ("," ~ ident)* ~ ")" }
+aggregation = { ("sum" | "avg" | "min" | "max" | "count") ~ grouping? ~ "(" ~ expr ~ ")" }
+binary_op = { "+" | "-" | "*" | "/" }
+binary = { atom ~ binary_op ~ atom }
+atom = _{ aggregation | func | vector | "(" ~ expr ~ ")" | number }
+expr = { binary | atom }
+query = { SOI ~ expr ~ EOI }

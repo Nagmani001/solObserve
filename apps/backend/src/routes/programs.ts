@@ -2,6 +2,8 @@ import { Router, type Router as ExpressRouter } from "express";
 import { prisma } from "@repo/database/client";
 import { PublicKey } from "@solana/web3.js";
 import { parseIdl } from "@repo/idl-parser-wasm";
+import { compile as compileDsl } from "@repo/dsl-wasm";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { writeAuditRow } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
@@ -41,6 +43,22 @@ const postBackfillBody = z.object({
 
 const postAccountBody = z.object({
   account: z.string().min(32).max(50),
+});
+
+const postQueryBody = z.object({
+  dsl: z.string().min(1),
+  from: z.number().int().positive(),
+  to: z.number().int().positive(),
+  step: z.string().optional(),
+});
+
+const postRawSqlBody = z.object({
+  sql: z.string().min(1),
+  params: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
+});
+
+const postNlQueryBody = z.object({
+  question: z.string().min(1),
 });
 
 export const programsRouter: ExpressRouter = Router();
@@ -638,6 +656,186 @@ programsRouter.post("/:id/accounts", async (req, res) => {
   return res.status(201).json({ id: row.id });
 });
 
+programsRouter.post("/:id/query", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postQueryBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const stepMs = parseStepMs(parsed.data.step, parsed.data.from, parsed.data.to);
+  let compiled: {
+    sql: string;
+    params: Record<string, unknown>;
+    plan: { labels: string[]; value_column: string; time_column: string };
+  };
+  try {
+    compiled = compileDsl(parsed.data.dsl, {
+      program_id: program.programId,
+      cluster: program.cluster,
+      from_ms: parsed.data.from,
+      to_ms: parsed.data.to,
+      step_ms: stepMs,
+    }) as {
+      sql: string;
+      params: Record<string, unknown>;
+      plan: { labels: string[]; value_column: string; time_column: string };
+    };
+  } catch (e) {
+    return res.status(400).json({
+      error: "dsl_compile_error",
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  const rows = await clickhouseQuery<Record<string, unknown>>({
+    sql: compiled.sql,
+    params: normalizeClickhouseParams(compiled.params),
+  });
+  return res.json(shapeQueryResult(rows, compiled.plan));
+});
+
+programsRouter.post("/:id/query/raw_sql", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postRawSqlBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const params: Record<string, string | number> = {
+    program_id: program.programId,
+    cluster: program.cluster,
+  };
+  for (const [k, v] of Object.entries(parsed.data.params ?? {})) {
+    if (typeof v === "boolean") {
+      params[k] = v ? 1 : 0;
+    } else {
+      params[k] = v;
+    }
+  }
+  const rows = await clickhouseQuery({ sql: parsed.data.sql, params });
+  return res.json({ rows });
+});
+
+programsRouter.get("/:id/metrics/catalog", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const latestIdl = await prisma.idl.findFirst({
+    where: { programIdFk: program.id },
+    orderBy: { version: "desc" },
+    select: { parsedJson: true },
+  });
+  const parsedJson = (latestIdl?.parsedJson ?? {}) as Record<string, unknown>;
+  const instructions = arrayField(parsedJson.instructions);
+  const errors = arrayField(parsedJson.errors);
+  const events = arrayField(parsedJson.events);
+
+  return res.json({
+    metrics: [
+      "instruction_calls_total",
+      "instruction_cu_consumed",
+      "errors_total",
+      "cpi_calls_total",
+      "signer_fees_lamports_total",
+    ],
+    labels: {
+      instruction: instructions
+        .map((x) => (typeof x?.name === "string" ? x.name : null))
+        .filter(Boolean),
+      error_name: errors
+        .map((x) => (typeof x?.name === "string" ? x.name : null))
+        .filter(Boolean),
+      event_type: events
+        .map((x) => (typeof x?.name === "string" ? x.name : null))
+        .filter(Boolean),
+    },
+  });
+});
+
+programsRouter.post("/:id/query/nl", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postNlQueryBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({
+      error: "not_configured",
+      message: "NL -> DSL not configured. Set ANTHROPIC_API_KEY.",
+    });
+  }
+  const anthropic = new Anthropic({ apiKey });
+  const completion = await anthropic.messages.create({
+    model: "claude-3-5-haiku-latest",
+    max_tokens: 300,
+    system:
+      "Translate user requests into SolObserve DSL. Return strict JSON with keys dsl, explanation, confidence.",
+    messages: [
+      {
+        role: "user",
+        content: `Question: ${parsed.data.question}\nProgram: ${program.programId}\nCluster: ${program.cluster}`,
+      },
+    ],
+  });
+  const text = completion.content
+    .map((c) => ("text" in c ? c.text : ""))
+    .join("")
+    .trim();
+  try {
+    const out = JSON.parse(text) as {
+      dsl: string;
+      explanation?: string;
+      confidence?: number;
+    };
+    return res.json({
+      dsl: out.dsl ?? "",
+      explanation: out.explanation ?? "",
+      confidence:
+        typeof out.confidence === "number"
+          ? Math.max(0, Math.min(1, out.confidence))
+          : 0.5,
+    });
+  } catch {
+    return res.json({
+      dsl: "",
+      explanation: text,
+      confidence: 0.2,
+    });
+  }
+});
+
 programsRouter.get("/:id/raw-stream", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
@@ -733,6 +931,86 @@ function defaultRpcForCluster(cluster: string): string {
       process.env.SOLANA_LOCALNET_RPC || "http://host.docker.internal:8899"
     );
   return "https://api.mainnet-beta.solana.com";
+}
+
+function parseStepMs(step: string | undefined, from: number, to: number): number {
+  if (!step) {
+    const windowMs = Math.max(1, to - from);
+    if (windowMs <= 60 * 60 * 1000) return 30_000;
+    if (windowMs <= 24 * 60 * 60 * 1000) return 60_000;
+    if (windowMs <= 7 * 24 * 60 * 60 * 1000) return 300_000;
+    return 3_600_000;
+  }
+  const m = step.match(/^(\d+)(s|m|h|d)$/);
+  if (!m) return 60_000;
+  const n = Number(m[1]);
+  const unit = m[2];
+  const mul =
+    unit === "s"
+      ? 1000
+      : unit === "m"
+        ? 60_000
+        : unit === "h"
+          ? 3_600_000
+          : 86_400_000;
+  return Math.max(1_000, n * mul);
+}
+
+function normalizeClickhouseParams(
+  params: Record<string, unknown>,
+): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if (typeof v === "number" || typeof v === "string") {
+      out[k] = v;
+      continue;
+    }
+    if (typeof v === "boolean") {
+      out[k] = v ? 1 : 0;
+      continue;
+    }
+    out[k] = JSON.stringify(v);
+  }
+  return out;
+}
+
+function shapeQueryResult(
+  rows: Record<string, unknown>[],
+  plan: { labels: string[]; value_column: string; time_column: string },
+) {
+  const byKey = new Map<
+    string,
+    { labels: Record<string, string>; points: Array<[number, number]> }
+  >();
+  for (const row of rows) {
+    const labels: Record<string, string> = {};
+    for (const l of plan.labels) {
+      const val = row[l];
+      if (typeof val === "string" || typeof val === "number") {
+        labels[l] = String(val);
+      }
+    }
+    const key = JSON.stringify(labels);
+    const tRaw = row[plan.time_column];
+    const vRaw = row[plan.value_column];
+    const t =
+      typeof tRaw === "number"
+        ? tRaw
+        : typeof tRaw === "string"
+          ? Date.parse(tRaw)
+          : Number.NaN;
+    const v = typeof vRaw === "number" ? vRaw : Number(vRaw);
+    if (!Number.isFinite(t) || !Number.isFinite(v)) continue;
+    const slot = byKey.get(key) ?? { labels, points: [] };
+    slot.points.push([t, v]);
+    byKey.set(key, slot);
+  }
+  return { series: Array.from(byKey.values()) };
+}
+
+function arrayField(v: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is Record<string, unknown> => Boolean(x && typeof x === "object"));
 }
 
 async function publishIngestControl(msg: {
