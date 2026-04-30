@@ -21,6 +21,7 @@
   "license": "ISC",
   "dependencies": {
     "@repo/database": "workspace:*",
+    "@repo/dashboard-templates": "workspace:*",
     "@repo/dsl-wasm": "workspace:*",
     "@repo/email": "workspace:*",
     "@repo/idl-parser-wasm": "workspace:*",

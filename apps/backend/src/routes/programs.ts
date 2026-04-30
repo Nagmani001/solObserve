@@ -4,6 +4,14 @@ import { PublicKey } from "@solana/web3.js";
 import { parseIdl } from "@repo/idl-parser-wasm";
 import { compile as compileDsl } from "@repo/dsl-wasm";
 import Anthropic from "@anthropic-ai/sdk";
+import { randomBytes } from "node:crypto";
+import genericAnchorTemplate from "@repo/dashboard-templates/generic-anchor.json";
+import dexTemplate from "@repo/dashboard-templates/dex.json";
+import lendingTemplate from "@repo/dashboard-templates/lending.json";
+import nftTemplate from "@repo/dashboard-templates/nft.json";
+import escrowTemplate from "@repo/dashboard-templates/escrow.json";
+import governanceTemplate from "@repo/dashboard-templates/governance.json";
+import stakingTemplate from "@repo/dashboard-templates/staking.json";
 import { z } from "zod";
 import { writeAuditRow } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
@@ -59,6 +67,46 @@ const postRawSqlBody = z.object({
 
 const postNlQueryBody = z.object({
   question: z.string().min(1),
+});
+
+const dashboardPanelInput = z.object({
+  id: z.string().uuid().optional(),
+  title: z.string().min(1),
+  panel_type: z.string().min(1),
+  query_dsl: z.string().min(1),
+  position: z
+    .object({
+      x: z.number().int(),
+      y: z.number().int(),
+      w: z.number().int().positive(),
+      h: z.number().int().positive(),
+    })
+    .passthrough(),
+  options: z.record(z.unknown()).default({}),
+});
+
+const postDashboardBody = z.object({
+  name: z.string().min(1),
+  slug: z.string().min(1).optional(),
+  panels: z.array(dashboardPanelInput).default([]),
+});
+
+const patchDashboardBody = z.object({
+  name: z.string().min(1).optional(),
+  panels: z.array(dashboardPanelInput).optional(),
+  auto_refresh_sec: z.number().int().min(5).max(3600).optional(),
+});
+
+const postTemplateInstallBody = z.object({
+  kind: z.enum([
+    "generic_anchor",
+    "dex",
+    "lending",
+    "nft",
+    "escrow",
+    "governance",
+    "staking",
+  ]),
 });
 
 export const programsRouter: ExpressRouter = Router();
@@ -193,6 +241,12 @@ programsRouter.post("/", async (req, res) => {
         },
       });
       await tx.$executeRaw`SELECT pg_notify('idl_updated', ${program_id})`;
+      await createDashboardFromTemplate(tx, {
+        programIdFk: prog.id,
+        ownerUserId: access.appUserId,
+        template: genericAnchorTemplate as DashboardTemplateDefinition,
+        markSeeded: true,
+      });
 
       if (auto_enable_ingestion) {
         await tx.ingestionConfig.upsert({
@@ -656,6 +710,264 @@ programsRouter.post("/:id/accounts", async (req, res) => {
   return res.status(201).json({ id: row.id });
 });
 
+programsRouter.get("/:id/dashboards", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const dashboards = await prisma.dashboard.findMany({
+    where: { programIdFk: program.id },
+    include: { panels: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return res.json({ dashboards });
+});
+
+programsRouter.post("/:id/dashboards", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postDashboardBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const slug = (parsed.data.slug?.trim() || slugify(parsed.data.name)).slice(0, 80);
+  const dashboard = await prisma.$transaction(async (tx) => {
+    const created = await tx.dashboard.create({
+      data: {
+        programIdFk: program.id,
+        name: parsed.data.name,
+        slug,
+        ownerUserId: access.appUserId,
+      },
+    });
+    if (parsed.data.panels.length) {
+      await tx.dashboardPanel.createMany({
+        data: parsed.data.panels.map((p) => ({
+          dashboardIdFk: created.id,
+          title: p.title,
+          panelType: p.panel_type,
+          queryDsl: p.query_dsl,
+          position: p.position,
+          options: p.options,
+        })),
+      });
+    }
+    return created;
+  });
+  return res.status(201).json({ id: dashboard.id });
+});
+
+programsRouter.patch("/:id/dashboards/:did", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = patchDashboardBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const did = req.params.did;
+  const existing = await prisma.dashboard.findFirst({
+    where: { id: did, programIdFk: program.id },
+  });
+  if (!existing) return res.status(404).json({ error: "dashboard_not_found" });
+  await prisma.$transaction(async (tx) => {
+    await tx.dashboard.update({
+      where: { id: did },
+      data: {
+        ...(parsed.data.name ? { name: parsed.data.name } : {}),
+      },
+    });
+    if (parsed.data.panels) {
+      await tx.dashboardPanel.deleteMany({ where: { dashboardIdFk: did } });
+      if (parsed.data.panels.length) {
+        await tx.dashboardPanel.createMany({
+          data: parsed.data.panels.map((p) => ({
+            dashboardIdFk: did,
+            title: p.title,
+            panelType: p.panel_type,
+            queryDsl: p.query_dsl,
+            position: p.position,
+            options: p.options,
+          })),
+        });
+      }
+    }
+  });
+  return res.json({ ok: true });
+});
+
+programsRouter.post("/:id/dashboards/:did/share", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const token = randomBytes(24).toString("base64url");
+  await prisma.dashboard.update({
+    where: { id: req.params.did },
+    data: {
+      shareToken: token,
+      shareRedactSigners:
+        typeof req.body?.share_redact_signers === "boolean"
+          ? req.body.share_redact_signers
+          : true,
+    },
+  });
+  return res.json({ token });
+});
+
+programsRouter.post("/:id/dashboards/:did/share/revoke", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  await prisma.dashboard.update({
+    where: { id: req.params.did },
+    data: { shareToken: null },
+  });
+  return res.json({ ok: true });
+});
+
+programsRouter.get("/share/:token", async (req, res) => {
+  const dash = await prisma.dashboard.findFirst({
+    where: { shareToken: req.params.token },
+    include: {
+      panels: true,
+      program: {
+        include: { project: true },
+      },
+    },
+  });
+  if (!dash) return res.status(404).json({ error: "not_found" });
+  return res.json({
+    dashboard: {
+      id: dash.id,
+      name: dash.name,
+      slug: dash.slug,
+      shareRedactSigners: dash.shareRedactSigners,
+      programId: dash.program.id,
+      cluster: dash.program.cluster,
+      panels: dash.panels,
+    },
+  });
+});
+
+programsRouter.post("/share/:token/query", async (req, res) => {
+  const parsed = postQueryBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const dash = await prisma.dashboard.findFirst({
+    where: { shareToken: req.params.token },
+    include: { program: true },
+  });
+  if (!dash) return res.status(404).json({ error: "not_found" });
+  const stepMs = parseStepMs(parsed.data.step, parsed.data.from, parsed.data.to);
+  let compiled: {
+    sql: string;
+    params: Record<string, unknown>;
+    plan: { labels: string[]; value_column: string; time_column: string };
+  };
+  try {
+    compiled = compileDsl(parsed.data.dsl, {
+      program_id: dash.program.programId,
+      cluster: dash.program.cluster,
+      from_ms: parsed.data.from,
+      to_ms: parsed.data.to,
+      step_ms: stepMs,
+    }) as {
+      sql: string;
+      params: Record<string, unknown>;
+      plan: { labels: string[]; value_column: string; time_column: string };
+    };
+  } catch (e) {
+    return res.status(400).json({
+      error: "dsl_compile_error",
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
+  const rows = await clickhouseQuery<Record<string, unknown>>({
+    sql: compiled.sql,
+    params: normalizeClickhouseParams(compiled.params),
+  });
+  const shaped = shapeQueryResult(rows, compiled.plan);
+  if (dash.shareRedactSigners) {
+    shaped.series = shaped.series.map((s) => ({
+      ...s,
+      labels: Object.fromEntries(
+        Object.entries(s.labels).map(([k, v]) => [k, k === "signer" ? "redacted" : v]),
+      ),
+    }));
+  }
+  return res.json(shaped);
+});
+
+programsRouter.get("/:id/templates", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const templates = templateCatalog();
+  return res.json({ templates });
+});
+
+programsRouter.post("/:id/templates/install", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postTemplateInstallBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const template = templateCatalog().find((t) => t.kind === parsed.data.kind);
+  if (!template) return res.status(404).json({ error: "template_not_found" });
+  const created = await prisma.$transaction(async (tx) =>
+    createDashboardFromTemplate(tx, {
+      programIdFk: program.id,
+      ownerUserId: access.appUserId,
+      template,
+      markSeeded: false,
+    }),
+  );
+  return res.status(201).json({ id: created.id });
+});
+
 programsRouter.post("/:id/query", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
@@ -856,6 +1168,28 @@ programsRouter.post("/:id/query/nl", async (req, res) => {
   }
 });
 
+programsRouter.get("/:id/platform-health", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const rows = await clickhouseQuery({
+    sql: `
+      SELECT metric, source, max(value) AS value, max(observed_at) AS observed_at
+      FROM platform_metrics
+      WHERE observed_at >= now() - INTERVAL 1 DAY
+      GROUP BY metric, source
+      ORDER BY metric, source
+    `,
+  });
+  return res.json({ rows });
+});
+
 programsRouter.get("/:id/raw-stream", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
@@ -1037,6 +1371,84 @@ function arrayField(v: unknown): Array<Record<string, unknown>> {
   return v.filter((x): x is Record<string, unknown> =>
     Boolean(x && typeof x === "object"),
   );
+}
+
+type DashboardTemplateDefinition = {
+  name: string;
+  kind: string;
+  panels: Array<{
+    title: string;
+    panel_type: string;
+    query_dsl: string;
+    position?: Record<string, number>;
+    options?: Record<string, unknown>;
+  }>;
+};
+
+function templateCatalog(): DashboardTemplateDefinition[] {
+  return [
+    genericAnchorTemplate as DashboardTemplateDefinition,
+    dexTemplate as DashboardTemplateDefinition,
+    lendingTemplate as DashboardTemplateDefinition,
+    nftTemplate as DashboardTemplateDefinition,
+    escrowTemplate as DashboardTemplateDefinition,
+    governanceTemplate as DashboardTemplateDefinition,
+    stakingTemplate as DashboardTemplateDefinition,
+  ];
+}
+
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+async function createDashboardFromTemplate(
+  tx: any,
+  input: {
+    programIdFk: string;
+    ownerUserId: string | null;
+    template: DashboardTemplateDefinition;
+    markSeeded: boolean;
+  },
+) {
+  const baseSlug = slugify(input.template.name || "dashboard") || "dashboard";
+  let slug = baseSlug;
+  let i = 1;
+  while (
+    await tx.dashboard.findFirst({
+      where: { programIdFk: input.programIdFk, slug },
+      select: { id: true },
+    })
+  ) {
+    i += 1;
+    slug = `${baseSlug}-${i}`;
+  }
+  const dashboard = await tx.dashboard.create({
+    data: {
+      programIdFk: input.programIdFk,
+      ownerUserId: input.ownerUserId,
+      name: input.template.name,
+      slug,
+      isTemplateSeeded: input.markSeeded,
+    },
+  });
+  if (input.template.panels.length) {
+    await tx.dashboardPanel.createMany({
+      data: input.template.panels.map((p, idx) => ({
+        dashboardIdFk: dashboard.id,
+        title: p.title,
+        panelType: p.panel_type,
+        queryDsl: p.query_dsl,
+        position: p.position ?? { x: 0, y: idx * 4, w: 6, h: 4 },
+        options: p.options ?? {},
+      })),
+    });
+  }
+  return dashboard;
 }
 
 async function publishIngestControl(msg: {

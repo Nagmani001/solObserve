@@ -1,0 +1,55 @@
+{
+  "name": "Generic Anchor",
+  "kind": "generic_anchor",
+  "panels": [
+    {
+      "title": "Calls per minute",
+      "panel_type": "timeseries",
+      "query_dsl": "sum by (instruction) (rate(instruction_calls_total[1m]))",
+      "position": { "x": 0, "y": 0, "w": 8, "h": 4 },
+      "options": { "stacked": true }
+    },
+    {
+      "title": "Success rate",
+      "panel_type": "single_stat",
+      "query_dsl": "1 - sum(rate(errors_total[5m])) / sum(rate(instruction_calls_total[5m]))",
+      "position": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "options": { "format": "percent" }
+    },
+    {
+      "title": "CU p50 / p95 / p99",
+      "panel_type": "timeseries",
+      "query_dsl": "histogram_quantile(0.95, instruction_cu_consumed)",
+      "position": { "x": 0, "y": 4, "w": 8, "h": 4 },
+      "options": { "legend": true }
+    },
+    {
+      "title": "Errors over time",
+      "panel_type": "timeseries",
+      "query_dsl": "sum by (error_name) (rate(errors_total[5m]))",
+      "position": { "x": 8, "y": 4, "w": 4, "h": 4 },
+      "options": { "stacked": true }
+    },
+    {
+      "title": "Top wallets by call count",
+      "panel_type": "table",
+      "query_dsl": "topk(10, sum by (signer) (increase(instruction_calls_total[1d])))",
+      "position": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "options": {}
+    },
+    {
+      "title": "Fees collected",
+      "panel_type": "single_stat",
+      "query_dsl": "sum(increase(signer_fees_lamports_total[1d]))",
+      "position": { "x": 6, "y": 8, "w": 3, "h": 4 },
+      "options": { "format": "lamports" }
+    },
+    {
+      "title": "Recent transactions",
+      "panel_type": "transaction_list",
+      "query_dsl": "instruction_calls_total{status=~\"success|failed\"}[1h]",
+      "position": { "x": 9, "y": 8, "w": 3, "h": 4 },
+      "options": { "limit": 50 }
+    }
+  ]
+}

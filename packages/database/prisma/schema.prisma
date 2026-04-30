@@ -117,6 +117,18 @@ enum CommitmentPromotion {
   @@map("commitment_promotion")
 }
 
+enum DashboardTemplateKind {
+  generic_anchor
+  dex
+  lending
+  nft
+  escrow
+  governance
+  staking
+
+  @@map("dashboard_template_kind")
+}
+
 // Control-plane tables migrated via sqlx (see crates/solobserve-storage/migrations). Do not prisma-migrate these.
 model SolobserveUser {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -189,10 +201,57 @@ model SolanaProgram {
   ingestionStates IngestionState[]
   ingestionErrors IngestionError[]
   trackedAccounts TrackedAccount[]
+  dashboards Dashboard[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
   @@map("programs")
+}
+
+model Dashboard {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk      String   @map("program_id_fk") @db.Uuid
+  name             String
+  slug             String
+  ownerUserId      String?  @map("owner_user_id") @db.Uuid
+  isTemplateSeeded Boolean  @default(false) @map("is_template_seeded")
+  shareToken       String?  @unique @map("share_token")
+  shareRedactSigners Boolean @default(true) @map("share_redact_signers")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program SolanaProgram  @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  panels  DashboardPanel[]
+
+  @@unique([programIdFk, slug])
+  @@map("dashboards")
+}
+
+model DashboardPanel {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dashboardIdFk String   @map("dashboard_id_fk") @db.Uuid
+  position      Json     @db.JsonB
+  title         String
+  panelType     String   @map("panel_type")
+  queryDsl      String   @map("query_dsl")
+  options       Json     @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  dashboard Dashboard @relation(fields: [dashboardIdFk], references: [id], onDelete: Cascade)
+
+  @@map("dashboard_panels")
+}
+
+model DashboardTemplate {
+  id         String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String                @unique
+  kind       DashboardTemplateKind
+  definition Json                  @db.JsonB
+  createdAt  DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("dashboard_templates")
 }
 
 model Idl {

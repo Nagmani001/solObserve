@@ -294,3 +294,105 @@ export async function getRawStreamDetail(programId: string, signature: string) {
   );
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function getDashboards(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/dashboards`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createDashboard(
+  programId: string,
+  input: { name: string; slug?: string; panels?: unknown[] },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/dashboards`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function patchDashboard(
+  programId: string,
+  dashboardId: string,
+  input: { name?: string; panels?: unknown[]; auto_refresh_sec?: number },
+) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/dashboards/${dashboardId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function runDashboardQuery(
+  programId: string,
+  input: { dsl: string; from: number; to: number; step?: string },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/query`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getDashboardTemplates(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/templates`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function installDashboardTemplate(
+  programId: string,
+  kind:
+    | "generic_anchor"
+    | "dex"
+    | "lending"
+    | "nft"
+    | "escrow"
+    | "governance"
+    | "staking",
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/templates/install`, {
+    method: "POST",
+    body: JSON.stringify({ kind }),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function shareDashboard(
+  programId: string,
+  dashboardId: string,
+  redactSigners = true,
+) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/dashboards/${dashboardId}/share`,
+    {
+      method: "POST",
+      body: JSON.stringify({ share_redact_signers: redactSigners }),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function revokeDashboardShare(programId: string, dashboardId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/dashboards/${dashboardId}/share/revoke`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getPlatformHealth(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/platform-health`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@repo/dashboard-templates",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./generic-anchor.json": "./generic-anchor.json",
+    "./dex.json": "./dex.json",
+    "./lending.json": "./lending.json",
+    "./nft.json": "./nft.json",
+    "./escrow.json": "./escrow.json",
+    "./governance.json": "./governance.json",
+    "./staking.json": "./staking.json"
+  }
+}

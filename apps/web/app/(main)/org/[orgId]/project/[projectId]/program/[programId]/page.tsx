@@ -10,6 +10,8 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { IngestionPanel } from "@/components/ingestion-panel";
 import { RawStreamPanel } from "@/components/raw-stream-panel";
+import { DashboardWorkspace } from "@/components/dashboard-workspace";
+import { PlatformHealthPanel } from "@/components/platform-health-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -94,10 +96,17 @@ export default async function ProgramHomePage({
           </TabsContent>
         )}
         <TabsContent value="dashboards" className="mt-6">
-          <EmptyState
-            title="Dashboards"
-            description="Grafana-like panels from the DSL appear in later plans."
-          />
+          <div className="space-y-4">
+            <DashboardWorkspace
+              programId={program.id}
+              canEdit={
+                !gate.forbidden && ["owner", "admin", "editor"].includes(gate.member.role)
+              }
+            />
+            {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
+              <PlatformHealthPanel programId={program.id} />
+            )}
+          </div>
         </TabsContent>
         <TabsContent value="errors" className="mt-6">
           <EmptyState
