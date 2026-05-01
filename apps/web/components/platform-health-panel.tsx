@@ -43,7 +43,10 @@ export function PlatformHealthPanel({ programId }: { programId: string }) {
       <h3 className="mb-2 text-sm font-medium">Platform health</h3>
       <div className="space-y-1">
         {rows.map((r, i) => (
-          <div key={`${r.metric}-${r.source}-${i}`} className="flex justify-between text-xs">
+          <div
+            key={`${r.metric}-${r.source}-${i}`}
+            className="flex justify-between text-xs"
+          >
             <span className="font-mono text-muted-foreground">
               {r.metric} · {r.source}
             </span>

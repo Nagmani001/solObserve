@@ -357,10 +357,13 @@ export async function installDashboardTemplate(
     | "governance"
     | "staking",
 ) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/templates/install`, {
-    method: "POST",
-    body: JSON.stringify({ kind }),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/templates/install`,
+    {
+      method: "POST",
+      body: JSON.stringify({ kind }),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -379,7 +382,10 @@ export async function shareDashboard(
   return (await res.json()) as Record<string, unknown>;
 }
 
-export async function revokeDashboardShare(programId: string, dashboardId: string) {
+export async function revokeDashboardShare(
+  programId: string,
+  dashboardId: string,
+) {
   const res = await authedBackendFetch(
     `/v1/programs/${programId}/dashboards/${dashboardId}/share/revoke`,
     {
@@ -391,8 +397,11 @@ export async function revokeDashboardShare(programId: string, dashboardId: strin
 }
 
 export async function getPlatformHealth(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/platform-health`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/platform-health`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }

@@ -27,12 +27,18 @@ export default async function EmbedPanelPage({
     cache: "no-store",
   });
   if (!res.ok) {
-    return <p className="p-2 text-xs text-muted-foreground">Invalid share link.</p>;
+    return (
+      <p className="p-2 text-xs text-muted-foreground">Invalid share link.</p>
+    );
   }
   const data = (await res.json()) as SharePayload;
-  const panel = data.dashboard.panels.find((p) => p.id === panelId) ?? data.dashboard.panels[0];
+  const panel =
+    data.dashboard.panels.find((p) => p.id === panelId) ??
+    data.dashboard.panels[0];
   if (!panel) {
-    return <p className="p-2 text-xs text-muted-foreground">Panel not found.</p>;
+    return (
+      <p className="p-2 text-xs text-muted-foreground">Panel not found.</p>
+    );
   }
   return (
     <main className="h-full w-full p-2">

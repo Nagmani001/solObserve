@@ -10,7 +10,10 @@ import {
   revokeDashboardShare,
   shareDashboard,
 } from "@/actions/control-plane";
-import { PanelRuntime, type DashboardPanelRecord } from "@/components/panels/panel-runtime";
+import {
+  PanelRuntime,
+  type DashboardPanelRecord,
+} from "@/components/panels/panel-runtime";
 
 type DashboardRecord = {
   id: string;
@@ -43,10 +46,14 @@ export function DashboardWorkspace({
       getDashboards(programId),
       getDashboardTemplates(programId),
     ]);
-    const db = ((dash as { dashboards?: DashboardRecord[] }).dashboards ?? []).map((d) => ({
+    const db = (
+      (dash as { dashboards?: DashboardRecord[] }).dashboards ?? []
+    ).map((d) => ({
       ...d,
       panels: (d.panels ?? []).sort(
-        (a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || (a.position?.x ?? 0) - (b.position?.x ?? 0),
+        (a, b) =>
+          (a.position?.y ?? 0) - (b.position?.y ?? 0) ||
+          (a.position?.x ?? 0) - (b.position?.x ?? 0),
       ),
     }));
     setDashboards(db);
@@ -75,7 +82,10 @@ export function DashboardWorkspace({
     if (!active) return;
     const title = prompt("Panel title", "Custom panel");
     if (!title) return;
-    const query = prompt("Panel DSL query", "rate(instruction_calls_total[5m])");
+    const query = prompt(
+      "Panel DSL query",
+      "rate(instruction_calls_total[5m])",
+    );
     if (!query) return;
     const nextPanels = [
       ...active.panels,
@@ -148,19 +158,31 @@ export function DashboardWorkspace({
         </select>
         {canEdit && (
           <>
-            <button className="rounded-md border px-2 py-1 text-sm" onClick={onCreateDashboard}>
+            <button
+              className="rounded-md border px-2 py-1 text-sm"
+              onClick={onCreateDashboard}
+            >
               New dashboard
             </button>
-            <button className="rounded-md border px-2 py-1 text-sm" onClick={onAddPanel}>
+            <button
+              className="rounded-md border px-2 py-1 text-sm"
+              onClick={onAddPanel}
+            >
               Add panel
             </button>
           </>
         )}
-        <button className="rounded-md border px-2 py-1 text-sm" onClick={onShare}>
+        <button
+          className="rounded-md border px-2 py-1 text-sm"
+          onClick={onShare}
+        >
           Share
         </button>
         {canEdit && (
-          <button className="rounded-md border px-2 py-1 text-sm" onClick={onRevokeShare}>
+          <button
+            className="rounded-md border px-2 py-1 text-sm"
+            onClick={onRevokeShare}
+          >
             Revoke share
           </button>
         )}
@@ -181,7 +203,9 @@ export function DashboardWorkspace({
           />
           <select
             value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as "1h" | "24h" | "7d")}
+            onChange={(e) =>
+              setTimeRange(e.target.value as "1h" | "24h" | "7d")
+            }
             className="rounded-md border bg-background px-2 py-1 text-xs"
           >
             <option value="1h">Last 1h</option>
@@ -193,7 +217,8 @@ export function DashboardWorkspace({
 
       {shareToken && (
         <div className="rounded-md border bg-muted/30 p-2 text-xs">
-          Share URL: <code>{`${window.location.origin}/share/${shareToken}`}</code>
+          Share URL:{" "}
+          <code>{`${window.location.origin}/share/${shareToken}`}</code>
         </div>
       )}
       {status && <p className="text-xs text-muted-foreground">{status}</p>}
@@ -204,7 +229,9 @@ export function DashboardWorkspace({
             <div
               key={panel.id}
               className="lg:col-span-6"
-              style={{ gridColumn: `span ${Math.max(3, Math.min(12, panel.position?.w ?? 6))}` }}
+              style={{
+                gridColumn: `span ${Math.max(3, Math.min(12, panel.position?.w ?? 6))}`,
+              }}
             >
               <PanelRuntime
                 programId={programId}
@@ -235,7 +262,9 @@ export function DashboardWorkspace({
           {templates.map((t) => (
             <div key={t.kind} className="rounded-md border p-2 text-xs">
               <p className="font-medium">{t.name}</p>
-              <p className="text-muted-foreground">Panels: {t.panels?.length ?? 0}</p>
+              <p className="text-muted-foreground">
+                Panels: {t.panels?.length ?? 0}
+              </p>
               {canEdit && (
                 <button
                   className="mt-2 rounded-md border px-2 py-1 text-xs"

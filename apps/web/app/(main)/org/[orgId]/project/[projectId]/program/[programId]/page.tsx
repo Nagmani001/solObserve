@@ -100,12 +100,14 @@ export default async function ProgramHomePage({
             <DashboardWorkspace
               programId={program.id}
               canEdit={
-                !gate.forbidden && ["owner", "admin", "editor"].includes(gate.member.role)
+                !gate.forbidden &&
+                ["owner", "admin", "editor"].includes(gate.member.role)
               }
             />
-            {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
-              <PlatformHealthPanel programId={program.id} />
-            )}
+            {!gate.forbidden &&
+              ["owner", "admin"].includes(gate.member.role) && (
+                <PlatformHealthPanel programId={program.id} />
+              )}
           </div>
         </TabsContent>
         <TabsContent value="errors" className="mt-6">

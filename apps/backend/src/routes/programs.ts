@@ -718,7 +718,11 @@ programsRouter.get("/:id/dashboards", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const dashboards = await prisma.dashboard.findMany({
     where: { programIdFk: program.id },
@@ -733,16 +737,25 @@ programsRouter.post("/:id/dashboards", async (req, res) => {
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
   const parsed = postDashboardBody.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
   }
   const program = await prisma.solanaProgram.findUnique({
     where: { id: req.params.id },
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
-  const slug = (parsed.data.slug?.trim() || slugify(parsed.data.name)).slice(0, 80);
+  const slug = (parsed.data.slug?.trim() || slugify(parsed.data.name)).slice(
+    0,
+    80,
+  );
   const dashboard = await prisma.$transaction(async (tx) => {
     const created = await tx.dashboard.create({
       data: {
@@ -759,8 +772,8 @@ programsRouter.post("/:id/dashboards", async (req, res) => {
           title: p.title,
           panelType: p.panel_type,
           queryDsl: p.query_dsl,
-          position: p.position,
-          options: p.options,
+          position: p.position as object,
+          options: p.options as object,
         })),
       });
     }
@@ -774,14 +787,20 @@ programsRouter.patch("/:id/dashboards/:did", async (req, res) => {
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
   const parsed = patchDashboardBody.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
   }
   const program = await prisma.solanaProgram.findUnique({
     where: { id: req.params.id },
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const did = req.params.did;
   const existing = await prisma.dashboard.findFirst({
@@ -804,8 +823,8 @@ programsRouter.patch("/:id/dashboards/:did", async (req, res) => {
             title: p.title,
             panelType: p.panel_type,
             queryDsl: p.query_dsl,
-            position: p.position,
-            options: p.options,
+            position: p.position as object,
+            options: p.options as object,
           })),
         });
       }
@@ -882,14 +901,20 @@ programsRouter.get("/share/:token", async (req, res) => {
 programsRouter.post("/share/:token/query", async (req, res) => {
   const parsed = postQueryBody.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
   }
   const dash = await prisma.dashboard.findFirst({
     where: { shareToken: req.params.token },
     include: { program: true },
   });
   if (!dash) return res.status(404).json({ error: "not_found" });
-  const stepMs = parseStepMs(parsed.data.step, parsed.data.from, parsed.data.to);
+  const stepMs = parseStepMs(
+    parsed.data.step,
+    parsed.data.from,
+    parsed.data.to,
+  );
   let compiled: {
     sql: string;
     params: Record<string, unknown>;
@@ -922,7 +947,10 @@ programsRouter.post("/share/:token/query", async (req, res) => {
     shaped.series = shaped.series.map((s) => ({
       ...s,
       labels: Object.fromEntries(
-        Object.entries(s.labels).map(([k, v]) => [k, k === "signer" ? "redacted" : v]),
+        Object.entries(s.labels).map(([k, v]) => [
+          k,
+          k === "signer" ? "redacted" : v,
+        ]),
       ),
     }));
   }
@@ -937,7 +965,11 @@ programsRouter.get("/:id/templates", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const templates = templateCatalog();
   return res.json({ templates });
@@ -953,7 +985,11 @@ programsRouter.post("/:id/templates/install", async (req, res) => {
     include: { project: true },
   });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const template = templateCatalog().find((t) => t.kind === parsed.data.kind);
   if (!template) return res.status(404).json({ error: "template_not_found" });

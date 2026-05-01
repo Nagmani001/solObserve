@@ -44,7 +44,10 @@ export function PanelRuntime({
     return () => clearInterval(id);
   }, []);
 
-  const dsl = useMemo(() => applyVars(panel.queryDsl, vars), [panel.queryDsl, vars]);
+  const dsl = useMemo(
+    () => applyVars(panel.queryDsl, vars),
+    [panel.queryDsl, vars],
+  );
 
   useEffect(() => {
     let done = false;
@@ -66,7 +69,11 @@ export function PanelRuntime({
           return;
         }
         setError(null);
-        setData((res as { series?: QuerySeries[] }).series ? { series: (res as { series: QuerySeries[] }).series } : { series: [] });
+        setData(
+          (res as { series?: QuerySeries[] }).series
+            ? { series: (res as { series: QuerySeries[] }).series }
+            : { series: [] },
+        );
       })
       .catch((e) => {
         if (done) return;
@@ -84,11 +91,15 @@ export function PanelRuntime({
     <div className="rounded-lg border bg-background p-3">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-medium">{panel.title}</h3>
-        <span className="text-[11px] text-muted-foreground">{panel.panelType}</span>
+        <span className="text-[11px] text-muted-foreground">
+          {panel.panelType}
+        </span>
       </div>
       {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
       {error && (
-        <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">{error}</p>
+        <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">
+          {error}
+        </p>
       )}
       {!loading && !error && (
         <PanelRenderer panelType={panel.panelType} series={data.series} />
@@ -148,13 +159,18 @@ function PanelRenderer({
         </div>
       ))}
       {series.length === 0 && (
-        <p className="text-xs text-muted-foreground">No points for this time range.</p>
+        <p className="text-xs text-muted-foreground">
+          No points for this time range.
+        </p>
       )}
     </div>
   );
 }
 
-function rangeToWindow(now: number, range: Vars["timeRange"]): [number, number, string] {
+function rangeToWindow(
+  now: number,
+  range: Vars["timeRange"],
+): [number, number, string] {
   if (range === "1h") return [now - 60 * 60 * 1000, now, "30s"];
   if (range === "24h") return [now - 24 * 60 * 60 * 1000, now, "1m"];
   return [now - 7 * 24 * 60 * 60 * 1000, now, "5m"];
@@ -187,7 +203,10 @@ function sparkline(values: number[]) {
     .map((v) => {
       const idx = Math.max(
         0,
-        Math.min(blocks.length - 1, Math.floor(((v - min) / (max - min)) * (blocks.length - 1))),
+        Math.min(
+          blocks.length - 1,
+          Math.floor(((v - min) / (max - min)) * (blocks.length - 1)),
+        ),
       );
       return blocks[idx] ?? "▁";
     })

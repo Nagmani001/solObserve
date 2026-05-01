@@ -28,7 +28,11 @@ export default async function SharedDashboardPage({
     cache: "no-store",
   });
   if (!res.ok) {
-    return <p className="p-8 text-sm text-muted-foreground">Share link is invalid.</p>;
+    return (
+      <p className="p-8 text-sm text-muted-foreground">
+        Share link is invalid.
+      </p>
+    );
   }
   const data = (await res.json()) as SharePayload;
   const dash = data.dashboard;

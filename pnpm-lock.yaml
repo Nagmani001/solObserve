@@ -26,6 +26,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.55.0
         version: 0.55.1
+      '@repo/dashboard-templates':
+        specifier: workspace:*
+        version: link:../../packages/dashboard-templates
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -182,6 +185,8 @@ importers:
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+
+  packages/dashboard-templates: {}
 
   packages/database:
     dependencies:
