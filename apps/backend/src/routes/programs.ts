@@ -1137,6 +1137,28 @@ programsRouter.get("/:id/metrics/catalog", async (req, res) => {
         .map((x) => (typeof x?.name === "string" ? x.name : null))
         .filter(Boolean),
     },
+    metricLabels: {
+      instruction_calls_total: ["instruction", "status"],
+      instruction_cu_consumed: ["instruction", "status"],
+      errors_total: ["instruction", "error_name"],
+      cpi_calls_total: ["callee_program"],
+      signer_fees_lamports_total: ["signer", "status"],
+      latency_processed_to_confirmed_ms: ["instruction"],
+    },
+    functions: [
+      "rate",
+      "irate",
+      "increase",
+      "sum",
+      "avg",
+      "min",
+      "max",
+      "count",
+      "topk",
+      "bottomk",
+      "histogram_quantile",
+      "event",
+    ],
   });
 });
 
@@ -1216,11 +1238,11 @@ programsRouter.get("/:id/platform-health", async (req, res) => {
   if ("error" in access) return res.status(access.status).json(access.body);
   const rows = await clickhouseQuery({
     sql: `
-      SELECT metric, source, max(value) AS value, max(observed_at) AS observed_at
+      SELECT metric_name AS metric, source, max(value) AS value, max(ts) AS observed_at
       FROM platform_metrics
-      WHERE observed_at >= now() - INTERVAL 1 DAY
-      GROUP BY metric, source
-      ORDER BY metric, source
+      WHERE ts >= now() - INTERVAL 1 DAY
+      GROUP BY metric_name, source
+      ORDER BY metric_name, source
     `,
   });
   return res.json({ rows });
@@ -1237,6 +1259,19 @@ programsRouter.get("/:id/raw-stream", async (req, res) => {
   const access = await assertOrgAccess(authCtx, program.project.orgId, "admin");
   if ("error" in access) return res.status(access.status).json(access.body);
   const limit = Number(req.query.limit ?? 25);
+  const from = Number(req.query.from ?? 0);
+  const to = Number(req.query.to ?? 0);
+  const status = typeof req.query.status === "string" ? req.query.status : "";
+  const signer = typeof req.query.signer === "string" ? req.query.signer : "";
+  const instruction =
+    typeof req.query.instruction === "string" ? req.query.instruction : "";
+  const fromClause = Number.isFinite(from) && from > 0 ? "AND t.block_time >= toDateTime({from_s:Int64})" : "";
+  const toClause = Number.isFinite(to) && to > 0 ? "AND t.block_time <= toDateTime({to_s:Int64})" : "";
+  const statusClause = status ? "AND t.status = {status:String}" : "";
+  const signerClause = signer ? "AND t.signer = {signer:String}" : "";
+  const instructionClause = instruction
+    ? "AND i.instruction_name = {instruction:String}"
+    : "";
   const rows = await clickhouseQuery({
     sql: `
       SELECT t.slot, t.block_time, t.signature, t.status, t.signer, t.fee_lamports, t.error_name,
@@ -1247,6 +1282,11 @@ programsRouter.get("/:id/raw-stream", async (req, res) => {
        AND i.program_id = t.program_id
       WHERE t.program_id = {program_id:String}
         AND t.signature NOT IN (SELECT signature FROM rollbacks)
+        ${fromClause}
+        ${toClause}
+        ${statusClause}
+        ${signerClause}
+        ${instructionClause}
       GROUP BY t.slot, t.block_time, t.signature, t.status, t.signer, t.fee_lamports, t.error_name
       ORDER BY t.slot DESC
       LIMIT {limit:UInt32}
@@ -1254,6 +1294,11 @@ programsRouter.get("/:id/raw-stream", async (req, res) => {
     params: {
       program_id: program.programId,
       limit: Math.max(1, Math.min(limit, 100)),
+      ...(fromClause ? { from_s: Math.floor(from / 1000) } : {}),
+      ...(toClause ? { to_s: Math.floor(to / 1000) } : {}),
+      ...(statusClause ? { status } : {}),
+      ...(signerClause ? { signer } : {}),
+      ...(instructionClause ? { instruction } : {}),
     },
   });
   return res.json({ rows });

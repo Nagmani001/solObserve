@@ -1,9 +1,10 @@
 CREATE TABLE IF NOT EXISTS platform_metrics (
-    metric String,
+    cluster LowCardinality(String) DEFAULT '',
     source LowCardinality(String),
+    metric_name String,
     value Float64,
-    labels String DEFAULT '{}',
-    observed_at DateTime DEFAULT now()
+    labels_json String DEFAULT '{}',
+    ts DateTime DEFAULT now()
 ) ENGINE = MergeTree
-PARTITION BY toYYYYMM(observed_at)
-ORDER BY (metric, source, observed_at);
+PARTITION BY toYYYYMM(ts)
+ORDER BY (metric_name, source, ts);

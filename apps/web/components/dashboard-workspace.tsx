@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import GridLayout, { type Layout } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 import {
   createDashboard,
   getDashboardTemplates,
@@ -14,6 +17,7 @@ import {
   PanelRuntime,
   type DashboardPanelRecord,
 } from "@/components/panels/panel-runtime";
+import { PanelEditorDialog } from "@/components/panels/panel-editor-dialog";
 
 type DashboardRecord = {
   id: string;
@@ -40,6 +44,9 @@ export function DashboardWorkspace({
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
   const [shareToken, setShareToken] = useState<string>("");
   const [status, setStatus] = useState<string>("");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingPanel, setEditingPanel] = useState<DashboardPanelRecord | null>(null);
+  const [layoutSaveTimer, setLayoutSaveTimer] = useState<number | null>(null);
 
   async function load() {
     const [dash, tpl] = await Promise.all([
@@ -80,35 +87,15 @@ export function DashboardWorkspace({
 
   async function onAddPanel() {
     if (!active) return;
-    const title = prompt("Panel title", "Custom panel");
-    if (!title) return;
-    const query = prompt(
-      "Panel DSL query",
-      "rate(instruction_calls_total[5m])",
-    );
-    if (!query) return;
-    const nextPanels = [
-      ...active.panels,
-      {
-        id: crypto.randomUUID(),
-        title,
-        panelType: "timeseries",
-        queryDsl: query,
-        position: { x: 0, y: active.panels.length * 4, w: 6, h: 4 },
-        options: {},
-      },
-    ];
-    await patchDashboard(programId, active.id, {
-      panels: nextPanels.map((p) => ({
-        id: p.id,
-        title: p.title,
-        panel_type: p.panelType,
-        query_dsl: p.queryDsl,
-        position: p.position,
-        options: p.options,
-      })),
+    setEditingPanel({
+      id: crypto.randomUUID(),
+      title: "Custom panel",
+      panelType: "timeseries",
+      queryDsl: "rate(instruction_calls_total[5m])",
+      position: { x: 0, y: active.panels.length * 4, w: 6, h: 4 },
+      options: {},
     });
-    await load();
+    setEditorOpen(true);
   }
 
   async function onInstallTemplate(kind: string) {
@@ -140,6 +127,55 @@ export function DashboardWorkspace({
     setShareToken("");
     setStatus("Share revoked.");
     await load();
+  }
+
+  async function savePanel(panel: DashboardPanelRecord) {
+    if (!active) return;
+    const existing = active.panels.find((p) => p.id === panel.id);
+    const nextPanels = existing
+      ? active.panels.map((p) => (p.id === panel.id ? panel : p))
+      : [...active.panels, panel];
+    await patchDashboard(programId, active.id, {
+      panels: nextPanels.map((p) => ({
+        id: p.id,
+        title: p.title,
+        panel_type: p.panelType,
+        query_dsl: p.queryDsl,
+        position: p.position,
+        options: p.options,
+      })),
+    });
+    await load();
+  }
+
+  function onLayoutChange(nextLayout: Layout[]) {
+    if (!active || !canEdit) return;
+    const byId = new Map(nextLayout.map((l) => [l.i, l]));
+    const nextPanels = active.panels.map((p) => {
+      const l = byId.get(p.id);
+      if (!l) return p;
+      return {
+        ...p,
+        position: { x: l.x, y: l.y, w: l.w, h: l.h },
+      };
+    });
+    setDashboards((prev) =>
+      prev.map((d) => (d.id === active.id ? { ...d, panels: nextPanels } : d)),
+    );
+    if (layoutSaveTimer) window.clearTimeout(layoutSaveTimer);
+    const id = window.setTimeout(() => {
+      patchDashboard(programId, active.id, {
+        panels: nextPanels.map((p) => ({
+          id: p.id,
+          title: p.title,
+          panel_type: p.panelType,
+          query_dsl: p.queryDsl,
+          position: p.position,
+          options: p.options,
+        })),
+      }).catch(() => {});
+    }, 500);
+    setLayoutSaveTimer(id);
   }
 
   return (
@@ -224,32 +260,51 @@ export function DashboardWorkspace({
       {status && <p className="text-xs text-muted-foreground">{status}</p>}
 
       {active ? (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          {active.panels.map((panel) => (
-            <div
-              key={panel.id}
-              className="lg:col-span-6"
-              style={{
-                gridColumn: `span ${Math.max(3, Math.min(12, panel.position?.w ?? 6))}`,
-              }}
-            >
-              <PanelRuntime
-                programId={programId}
-                panel={panel}
-                vars={{
-                  instruction: instructionVar ? instructionVar.split("|") : [],
-                  signer: signerVar,
-                  timeRange,
+        <>
+          <GridLayout
+            className="layout"
+            cols={12}
+            rowHeight={50}
+            width={1200}
+            isDraggable={canEdit}
+            isResizable={canEdit}
+            onLayoutChange={onLayoutChange}
+            margin={[12, 12]}
+          >
+            {active.panels.map((panel) => (
+              <div
+                key={panel.id}
+                data-grid={{
+                  i: panel.id,
+                  x: panel.position?.x ?? 0,
+                  y: panel.position?.y ?? 0,
+                  w: Math.max(3, Math.min(12, panel.position?.w ?? 6)),
+                  h: Math.max(3, Math.min(12, panel.position?.h ?? 4)),
                 }}
-              />
-            </div>
-          ))}
+              >
+                <PanelRuntime
+                  programId={programId}
+                  panel={panel}
+                  vars={{
+                    instruction: instructionVar ? instructionVar.split("|") : [],
+                    signer: signerVar,
+                    timeRange,
+                  }}
+                  canEdit={canEdit}
+                  onEdit={() => {
+                    setEditingPanel(panel);
+                    setEditorOpen(true);
+                  }}
+                />
+              </div>
+            ))}
+          </GridLayout>
           {active.panels.length === 0 && (
             <p className="text-sm text-muted-foreground">
               No panels yet. Add one or install a template.
             </p>
           )}
-        </div>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">
           No dashboard yet. Create one or install a template.
@@ -277,6 +332,13 @@ export function DashboardWorkspace({
           ))}
         </div>
       </div>
+      <PanelEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        programId={programId}
+        initial={editingPanel}
+        onSave={savePanel}
+      />
     </div>
   );
 }

@@ -276,8 +276,32 @@ export async function addTrackedAccount(programId: string, account: string) {
 }
 
 export async function getRawStream(programId: string, limit = 25) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/raw-stream?limit=${limit}`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getRawStreamFiltered(
+  programId: string,
+  input: {
+    limit?: number;
+    from?: number;
+    to?: number;
+    status?: string;
+    signer?: string;
+    instruction?: string;
+  },
+) {
+  const q = new URLSearchParams();
+  q.set("limit", String(input.limit ?? 25));
+  if (input.from) q.set("from", String(input.from));
+  if (input.to) q.set("to", String(input.to));
+  if (input.status) q.set("status", input.status);
+  if (input.signer) q.set("signer", input.signer);
+  if (input.instruction) q.set("instruction", input.instruction);
   const res = await authedBackendFetch(
-    `/v1/programs/${programId}/raw-stream?limit=${limit}`,
+    `/v1/programs/${programId}/raw-stream?${q.toString()}`,
     {
       method: "GET",
     },
@@ -292,6 +316,13 @@ export async function getRawStreamDetail(programId: string, signature: string) {
       method: "GET",
     },
   );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getMetricsCatalog(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/metrics/catalog`, {
+    method: "GET",
+  });
   return (await res.json()) as Record<string, unknown>;
 }
 

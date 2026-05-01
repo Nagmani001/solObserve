@@ -26,6 +26,15 @@ export default async function RawDetailPage({
     );
   }
   const tx = data.tx as Record<string, unknown> | null;
+  const cluster = String(tx?.cluster ?? "");
+  const solscanUrl =
+    cluster === "mainnet"
+      ? `https://solscan.io/tx/${signature}`
+      : cluster === "devnet"
+        ? `https://solscan.io/tx/${signature}?cluster=devnet`
+        : cluster === "testnet"
+          ? `https://solscan.io/tx/${signature}?cluster=testnet`
+          : "";
   const instructions = (data.instructions as Record<string, unknown>[]) || [];
   const events = (data.events as Record<string, unknown>[]) || [];
   const cpi = (data.cpi_edges as Record<string, unknown>[]) || [];
@@ -71,14 +80,16 @@ export default async function RawDetailPage({
         </pre>
       </section>
 
-      <a
-        href={`https://solscan.io/tx/${signature}`}
-        target="_blank"
-        rel="noreferrer"
-        className="text-sm underline underline-offset-2"
-      >
-        Open in Solscan
-      </a>
+      {solscanUrl && (
+        <a
+          href={solscanUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm underline underline-offset-2"
+        >
+          Open in Solscan
+        </a>
+      )}
     </div>
   );
 }

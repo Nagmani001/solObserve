@@ -90,8 +90,41 @@ services:
       "
     restart: "no"
 
+  metrics-scraper:
+    image: rust:1.86
+    container_name: solobserve-metrics-scraper
+    working_dir: /workspace
+    command: >
+      /bin/bash -lc "cargo run --manifest-path services/metrics-scraper/Cargo.toml"
+    environment:
+      POSTGRES_URL: postgresql://solobserve:solobserve@postgres:5432/solobserve
+      DATABASE_URL: postgresql://solobserve:solobserve@postgres:5432/solobserve
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DB: solobserve
+      NATS_URL: nats://nats:4222
+      S3_ENDPOINT: http://minio:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: solobserve-raw
+      S3_FORCE_PATH_STYLE: "true"
+      INGESTOR_METRICS_URL: http://ingestor:9100/metrics
+      DECODER_METRICS_URL: http://decoder:9191/metrics
+    volumes:
+      - ..:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata:
   chdata:
   natsdata:
   miniodata:
+  cargo-cache:
+  target-cache:
