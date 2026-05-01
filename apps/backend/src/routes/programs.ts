@@ -1265,8 +1265,14 @@ programsRouter.get("/:id/raw-stream", async (req, res) => {
   const signer = typeof req.query.signer === "string" ? req.query.signer : "";
   const instruction =
     typeof req.query.instruction === "string" ? req.query.instruction : "";
-  const fromClause = Number.isFinite(from) && from > 0 ? "AND t.block_time >= toDateTime({from_s:Int64})" : "";
-  const toClause = Number.isFinite(to) && to > 0 ? "AND t.block_time <= toDateTime({to_s:Int64})" : "";
+  const fromClause =
+    Number.isFinite(from) && from > 0
+      ? "AND t.block_time >= toDateTime({from_s:Int64})"
+      : "";
+  const toClause =
+    Number.isFinite(to) && to > 0
+      ? "AND t.block_time <= toDateTime({to_s:Int64})"
+      : "";
   const statusClause = status ? "AND t.status = {status:String}" : "";
   const signerClause = signer ? "AND t.signer = {signer:String}" : "";
   const instructionClause = instruction

@@ -7,9 +7,18 @@ import { scaleLinear, scaleTime } from "@visx/scale";
 import { AreaClosed, Bar, LinePath } from "@visx/shape";
 import { extent, max, bin } from "d3-array";
 import { scaleSequential } from "d3-scale";
-import { interpolateInferno } from "d3-interpolate";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@repo/ui/components/dialog";
-import { getRawStreamDetail, getRawStreamFiltered, runDashboardQuery } from "@/actions/control-plane";
+import { interpolateInferno } from "d3-scale-chromatic";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@repo/ui/components/dialog";
+import {
+  getRawStreamDetail,
+  getRawStreamFiltered,
+  runDashboardQuery,
+} from "@/actions/control-plane";
 import { getBackendUrl } from "@/lib/util";
 
 type QueryPoint = [number, number];
@@ -52,7 +61,9 @@ export function PanelRuntime({
   const [now, setNow] = useState(Date.now());
   const [drillOpen, setDrillOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [drillRows, setDrillRows] = useState<Array<Record<string, unknown>>>([]);
+  const [drillRows, setDrillRows] = useState<Array<Record<string, unknown>>>(
+    [],
+  );
   const [detail, setDetail] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
@@ -108,9 +119,14 @@ export function PanelRuntime({
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-medium">{panel.title}</h3>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground">{panel.panelType}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {panel.panelType}
+          </span>
           {canEdit && onEdit && (
-            <button className="rounded border px-2 py-0.5 text-[11px]" onClick={onEdit}>
+            <button
+              className="rounded border px-2 py-0.5 text-[11px]"
+              onClick={onEdit}
+            >
               Edit
             </button>
           )}
@@ -136,7 +152,10 @@ export function PanelRuntime({
               status: bucket.labels.status,
               limit: 50,
             });
-            setDrillRows(((res as { rows?: Record<string, unknown>[] }).rows ?? []) as Record<string, unknown>[]);
+            setDrillRows(
+              ((res as { rows?: Record<string, unknown>[] }).rows ??
+                []) as Record<string, unknown>[],
+            );
             setDrillOpen(true);
           }}
           onTxClick={async (signature) => {
@@ -205,8 +224,14 @@ export function PanelRuntime({
               {JSON.stringify(detail, null, 2)}
             </pre>
             {(() => {
-              const sig = String((detail?.tx as Record<string, unknown> | undefined)?.signature ?? "");
-              const cluster = String((detail?.tx as Record<string, unknown> | undefined)?.cluster ?? "");
+              const sig = String(
+                (detail?.tx as Record<string, unknown> | undefined)
+                  ?.signature ?? "",
+              );
+              const cluster = String(
+                (detail?.tx as Record<string, unknown> | undefined)?.cluster ??
+                  "",
+              );
               const link =
                 cluster === "mainnet"
                   ? `https://solscan.io/tx/${sig}`
@@ -217,7 +242,12 @@ export function PanelRuntime({
                       : "";
               if (!link || !sig) return null;
               return (
-                <a className="underline" href={link} target="_blank" rel="noreferrer">
+                <a
+                  className="underline"
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Open in Solscan
                 </a>
               );
@@ -239,7 +269,11 @@ function PanelRenderer({
   panelType: string;
   series: QuerySeries[];
   options: Record<string, unknown>;
-  onDrill: (bucket: { from: number; to: number; labels: Record<string, string> }) => void;
+  onDrill: (bucket: {
+    from: number;
+    to: number;
+    labels: Record<string, string>;
+  }) => void;
   onTxClick: (signature: string) => void;
 }) {
   if (panelType === "single_stat") {
@@ -249,9 +283,9 @@ function PanelRenderer({
       : null;
     const color =
       thresholds && thresholds.length >= 3
-        ? last >= thresholds[2]
+        ? last >= (thresholds[2] ?? Infinity)
           ? "text-red-500"
-          : last >= thresholds[1]
+          : last >= (thresholds[1] ?? Infinity)
             ? "text-amber-500"
             : "text-emerald-500"
         : "";
@@ -315,8 +349,19 @@ function PanelRenderer({
       </div>
     );
   }
-  if (panelType === "timeseries" || panelType === "log_stream" || panelType === "cpi_tree" || panelType === "state_snapshot") {
-    return <TimeSeriesPanel series={series} stacked={Boolean(options.stacked)} onDrill={onDrill} />;
+  if (
+    panelType === "timeseries" ||
+    panelType === "log_stream" ||
+    panelType === "cpi_tree" ||
+    panelType === "state_snapshot"
+  ) {
+    return (
+      <TimeSeriesPanel
+        series={series}
+        stacked={Boolean(options.stacked)}
+        onDrill={onDrill}
+      />
+    );
   }
   return (
     <div className="space-y-1">
@@ -348,17 +393,31 @@ function TimeSeriesPanel({
 }: {
   series: QuerySeries[];
   stacked: boolean;
-  onDrill: (bucket: { from: number; to: number; labels: Record<string, string> }) => void;
+  onDrill: (bucket: {
+    from: number;
+    to: number;
+    labels: Record<string, string>;
+  }) => void;
 }) {
   const width = 760;
   const height = 220;
   const margin = { top: 10, right: 20, bottom: 30, left: 48 };
-  const points = series.flatMap((s) => s.points.map((p) => ({ t: p[0], v: p[1], labels: s.labels })));
-  if (!points.length) return <p className="text-xs text-muted-foreground">No points.</p>;
+  const points = series.flatMap((s) =>
+    s.points.map((p) => ({ t: p[0], v: p[1], labels: s.labels })),
+  );
+  if (!points.length)
+    return <p className="text-xs text-muted-foreground">No points.</p>;
   const xDomain = extent(points, (d) => d.t) as [number, number];
   const yMax = max(points, (d) => d.v) ?? 1;
-  const x = scaleTime<number>({ domain: xDomain, range: [margin.left, width - margin.right] });
-  const y = scaleLinear<number>({ domain: [0, yMax], range: [height - margin.bottom, margin.top], nice: true });
+  const x = scaleTime<number>({
+    domain: xDomain,
+    range: [margin.left, width - margin.right],
+  });
+  const y = scaleLinear<number>({
+    domain: [0, yMax],
+    range: [height - margin.bottom, margin.top],
+    nice: true,
+  });
   return (
     <div className="space-y-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
@@ -430,10 +489,20 @@ function TinySparkline({ series }: { series: QuerySeries[] }) {
   const xDomain = extent(points, (d) => d[0]) as [number, number];
   const yMax = max(points, (d) => d[1]) ?? 1;
   const x = scaleTime<number>({ domain: xDomain, range: [0, width] });
-  const y = scaleLinear<number>({ domain: [0, yMax], range: [height, 0], nice: true });
+  const y = scaleLinear<number>({
+    domain: [0, yMax],
+    range: [height, 0],
+    nice: true,
+  });
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-[220px]">
-      <LinePath data={points} x={(d) => x(d[0])} y={(d) => y(d[1])} stroke="#4f46e5" strokeWidth={1.5} />
+      <LinePath
+        data={points}
+        x={(d) => x(d[0])}
+        y={(d) => y(d[1])}
+        stroke="#4f46e5"
+        strokeWidth={1.5}
+      />
     </svg>
   );
 }
@@ -450,8 +519,18 @@ function GaugePanel({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-4">
       <svg width={140} height={90}>
-        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#e5e7eb" strokeWidth={10} />
-        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${x} ${y}`} fill="none" stroke="#6366f1" strokeWidth={10} />
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none"
+          stroke="#e5e7eb"
+          strokeWidth={10}
+        />
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${x} ${y}`}
+          fill="none"
+          stroke="#6366f1"
+          strokeWidth={10}
+        />
       </svg>
       <p className="text-2xl font-semibold">{formatValue(value)}</p>
     </div>
@@ -462,16 +541,22 @@ function HeatmapPanel({ series }: { series: QuerySeries[] }) {
   const width = 760;
   const height = 220;
   const all = series.flatMap((s) => s.points);
-  if (!all.length) return <p className="text-xs text-muted-foreground">No heatmap data.</p>;
+  if (!all.length)
+    return <p className="text-xs text-muted-foreground">No heatmap data.</p>;
   const tExtent = extent(all, (p) => p[0]) as [number, number];
   const vExtent = extent(all, (p) => p[1]) as [number, number];
   const x = scaleTime<number>({ domain: tExtent, range: [0, width] });
   const y = scaleLinear<number>({ domain: vExtent, range: [height, 0] });
-  const color = scaleSequential(interpolateInferno).domain([0, Math.max(1, all.length / 3)]);
+  const color = scaleSequential(interpolateInferno).domain([
+    0,
+    Math.max(1, all.length / 3),
+  ]);
   const cells = new Map<string, number>();
   all.forEach(([t, v]) => {
     const tx = Math.floor((t - tExtent[0]) / 60000);
-    const vy = Math.floor((v - vExtent[0]) / Math.max(1, (vExtent[1] - vExtent[0]) / 20));
+    const vy = Math.floor(
+      (v - vExtent[0]) / Math.max(1, (vExtent[1] - vExtent[0]) / 20),
+    );
     const key = `${tx}:${vy}`;
     cells.set(key, (cells.get(key) ?? 0) + 1);
   });
@@ -482,8 +567,8 @@ function HeatmapPanel({ series }: { series: QuerySeries[] }) {
         return (
           <rect
             key={k}
-            x={tx * 6}
-            y={height - vy * 8}
+            x={(tx ?? 0) * 6}
+            y={height - (vy ?? 0) * 8}
             width={6}
             height={8}
             fill={color(c)}
@@ -499,7 +584,8 @@ function HeatmapPanel({ series }: { series: QuerySeries[] }) {
 
 function HistogramPanel({ series }: { series: QuerySeries[] }) {
   const values = series.flatMap((s) => s.points.map((p) => p[1]));
-  if (!values.length) return <p className="text-xs text-muted-foreground">No histogram data.</p>;
+  if (!values.length)
+    return <p className="text-xs text-muted-foreground">No histogram data.</p>;
   const buckets = bin().thresholds(16)(values);
   const width = 760;
   const height = 220;

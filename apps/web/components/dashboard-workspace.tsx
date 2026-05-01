@@ -45,7 +45,9 @@ export function DashboardWorkspace({
   const [shareToken, setShareToken] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingPanel, setEditingPanel] = useState<DashboardPanelRecord | null>(null);
+  const [editingPanel, setEditingPanel] = useState<DashboardPanelRecord | null>(
+    null,
+  );
   const [layoutSaveTimer, setLayoutSaveTimer] = useState<number | null>(null);
 
   async function load() {
@@ -286,7 +288,9 @@ export function DashboardWorkspace({
                   programId={programId}
                   panel={panel}
                   vars={{
-                    instruction: instructionVar ? instructionVar.split("|") : [],
+                    instruction: instructionVar
+                      ? instructionVar.split("|")
+                      : [],
                     signer: signerVar,
                     timeRange,
                   }}

@@ -2,11 +2,21 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@repo/ui/components/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@repo/ui/components/dialog";
 import { getMetricsCatalog, runDashboardQuery } from "@/actions/control-plane";
-import { PanelRuntime, type DashboardPanelRecord } from "@/components/panels/panel-runtime";
+import {
+  PanelRuntime,
+  type DashboardPanelRecord,
+} from "@/components/panels/panel-runtime";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+});
 
 const PANEL_TYPES = [
   "timeseries",
@@ -42,8 +52,12 @@ export function PanelEditorDialog({
   onSave: (panel: DashboardPanelRecord) => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "Custom panel");
-  const [panelType, setPanelType] = useState(initial?.panelType ?? "timeseries");
-  const [dsl, setDsl] = useState(initial?.queryDsl ?? "rate(instruction_calls_total[5m])");
+  const [panelType, setPanelType] = useState(
+    initial?.panelType ?? "timeseries",
+  );
+  const [dsl, setDsl] = useState(
+    initial?.queryDsl ?? "rate(instruction_calls_total[5m])",
+  );
   const [catalog, setCatalog] = useState<Catalog>({ metrics: [], labels: {} });
   const [error, setError] = useState<string | null>(null);
   const [monacoCtx, setMonacoCtx] = useState<{
@@ -73,11 +87,18 @@ export function PanelEditorDialog({
       const now = Date.now();
       const from = now - 60 * 60 * 1000;
       const to = now;
-      const res = await runDashboardQuery(programId, { dsl, from, to, step: "30s" });
+      const res = await runDashboardQuery(programId, {
+        dsl,
+        from,
+        to,
+        step: "30s",
+      });
       const model = monacoCtx.editor.getModel();
       if (!model) return;
       if ("error" in res && String(res.error) === "dsl_compile_error") {
-        const msg = String((res as { message?: string }).message ?? "DSL parse/compile error");
+        const msg = String(
+          (res as { message?: string }).message ?? "DSL parse/compile error",
+        );
         setError(msg);
         const lc = /line\s+(\d+)\s*,?\s*column\s+(\d+)/i.exec(msg);
         const line = lc ? Number(lc[1]) : 1;
@@ -117,7 +138,9 @@ export function PanelEditorDialog({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Panel type</label>
+              <label className="text-xs text-muted-foreground">
+                Panel type
+              </label>
               <select
                 value={panelType}
                 onChange={(e) => setPanelType(e.target.value)}
@@ -140,27 +163,36 @@ export function PanelEditorDialog({
                   onChange={(v) => setDsl(v || "")}
                   onMount={(editor, monaco) => {
                     monaco.languages.register({ id: "solobserve-dsl" });
-                    monaco.languages.setMonarchTokensProvider("solobserve-dsl", {
-                      tokenizer: {
-                        root: [
-                          [/\b(sum|avg|min|max|count|by|without|rate|irate|increase|histogram_quantile|topk|bottomk|event)\b/, "keyword"],
-                          [/\{|\}|\[|\]|\(|\)|,/, "delimiter"],
-                          [/=~|!~|!=|=|\+|-|\*|\//, "operator"],
-                          [/"[^"]*"/, "string"],
-                          [/\d+[smhd]/, "number"],
-                          [/[a-zA-Z_][\w.]*/, "identifier"],
-                        ],
+                    monaco.languages.setMonarchTokensProvider(
+                      "solobserve-dsl",
+                      {
+                        tokenizer: {
+                          root: [
+                            [
+                              /\b(sum|avg|min|max|count|by|without|rate|irate|increase|histogram_quantile|topk|bottomk|event)\b/,
+                              "keyword",
+                            ],
+                            [/\{|\}|\[|\]|\(|\)|,/, "delimiter"],
+                            [/=~|!~|!=|=|\+|-|\*|\//, "operator"],
+                            [/"[^"]*"/, "string"],
+                            [/\d+[smhd]/, "number"],
+                            [/[a-zA-Z_][\w.]*/, "identifier"],
+                          ],
+                        },
                       },
-                    });
-                    monaco.languages.registerCompletionItemProvider("solobserve-dsl", {
-                      provideCompletionItems: () => ({
-                        suggestions: completionWords.map((w) => ({
-                          label: w,
-                          kind: monaco.languages.CompletionItemKind.Keyword,
-                          insertText: w,
-                        })),
-                      }),
-                    });
+                    );
+                    monaco.languages.registerCompletionItemProvider(
+                      "solobserve-dsl",
+                      {
+                        provideCompletionItems: () => ({
+                          suggestions: completionWords.map((w) => ({
+                            label: w,
+                            kind: monaco.languages.CompletionItemKind.Keyword,
+                            insertText: w,
+                          })),
+                        }),
+                      },
+                    );
                     setMonacoCtx({ editor, monaco });
                     editor.onDidChangeModelContent(() => {
                       // Minimal inline parse marker heuristic: unbalanced braces.
@@ -168,13 +200,19 @@ export function PanelEditorDialog({
                       const opens = (value.match(/\{/g) ?? []).length;
                       const closes = (value.match(/\}/g) ?? []).length;
                       if (opens !== closes) {
-                        setError("Possible DSL syntax error: unmatched braces.");
+                        setError(
+                          "Possible DSL syntax error: unmatched braces.",
+                        );
                       } else {
                         setError(null);
                       }
                     });
                   }}
-                  options={{ minimap: { enabled: false }, fontSize: 13, wordWrap: "on" }}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 13,
+                    wordWrap: "on",
+                  }}
                 />
               </div>
             </div>

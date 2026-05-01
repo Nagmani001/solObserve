@@ -276,9 +276,12 @@ export async function addTrackedAccount(programId: string, account: string) {
 }
 
 export async function getRawStream(programId: string, limit = 25) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/raw-stream?limit=${limit}`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/raw-stream?limit=${limit}`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -320,9 +323,12 @@ export async function getRawStreamDetail(programId: string, signature: string) {
 }
 
 export async function getMetricsCatalog(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/metrics/catalog`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/metrics/catalog`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
