@@ -1112,6 +1112,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "error-grouper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "solobserve-config",
+ "solobserve-storage",
+ "solobserve-types",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "etcetera"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

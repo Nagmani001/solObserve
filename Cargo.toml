@@ -6,6 +6,7 @@ members = [
     "services/alerter",
     "services/replay",
     "services/metrics-scraper",
+    "services/error-grouper",
     "crates/solana-rpc-client",
     "crates/schema-registry",
     "crates/solobserve-types",

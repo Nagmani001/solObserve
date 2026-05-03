@@ -129,6 +129,24 @@ enum DashboardTemplateKind {
   @@map("dashboard_template_kind")
 }
 
+enum ErrorIssueStatus {
+  open
+  acknowledged
+  resolved
+  muted
+
+  @@map("error_issue_status")
+}
+
+enum ErrorClassification {
+  anchor_constraint
+  anchor_custom
+  runtime
+  unknown
+
+  @@map("error_classification")
+}
+
 // Control-plane tables migrated via sqlx (see crates/solobserve-storage/migrations). Do not prisma-migrate these.
 model SolobserveUser {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -202,6 +220,9 @@ model SolanaProgram {
   ingestionErrors IngestionError[]
   trackedAccounts TrackedAccount[]
   dashboards Dashboard[]
+  errorIssues ErrorIssue[]
+  fieldWatches PendingFieldWatch[]
+  errorNotifications ErrorNotification[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
@@ -252,6 +273,97 @@ model DashboardTemplate {
   updatedAt  DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("dashboard_templates")
+}
+
+model ErrorIssue {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk       String              @map("program_id_fk") @db.Uuid
+  fingerprint       String
+  instructionName   String?             @map("instruction_name")
+  errorCode         Int?                @map("error_code")
+  errorName         String?             @map("error_name")
+  classification    ErrorClassification @default(unknown)
+  topConstraintKind String?             @map("top_constraint_kind")
+  firstSeenAt       DateTime            @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime            @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  totalCount        BigInt              @default(0) @map("total_count")
+  status            ErrorIssueStatus    @default(open)
+  mutedUntil        DateTime?           @map("muted_until") @db.Timestamptz(6)
+  assigneeUserId    String?             @map("assignee_user_id") @db.Uuid
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program       SolanaProgram       @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  samples       ErrorSample[]
+  comments      ErrorComment[]
+  notifications ErrorNotification[]
+
+  @@unique([programIdFk, fingerprint])
+  @@map("error_issues")
+}
+
+model ErrorSample {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issueIdFk          String    @map("issue_id_fk") @db.Uuid
+  signature          String
+  slot               BigInt
+  blockTime          DateTime? @map("block_time") @db.Timestamptz(6)
+  signer             String?
+  decodedArgs        Json      @map("decoded_args") @db.JsonB
+  decodedAccounts    Json      @map("decoded_accounts") @db.JsonB
+  logLines           String[]  @map("log_lines")
+  constraintKind     String?   @map("constraint_kind")
+  constraintExpected String?   @map("constraint_expected")
+  constraintGot      String?   @map("constraint_got")
+  cuConsumed         BigInt?   @map("cu_consumed")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  issue ErrorIssue @relation(fields: [issueIdFk], references: [id], onDelete: Cascade)
+
+  @@map("error_samples")
+}
+
+model ErrorComment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  issueIdFk String   @map("issue_id_fk") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  issue ErrorIssue @relation(fields: [issueIdFk], references: [id], onDelete: Cascade)
+  user  SolobserveUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("error_comments")
+}
+
+model PendingFieldWatch {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk      String   @map("program_id_fk") @db.Uuid
+  account          String
+  fieldPath        String   @map("field_path")
+  op               String
+  thresholdNumeric Float?   @map("threshold_numeric")
+  createdByUserId  String?  @map("created_by_user_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@map("pending_field_watches")
+}
+
+model ErrorNotification {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk String    @map("program_id_fk") @db.Uuid
+  issueIdFk   String?   @map("issue_id_fk") @db.Uuid
+  kind        String
+  payload     Json      @db.JsonB
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  issue   ErrorIssue?   @relation(fields: [issueIdFk], references: [id], onDelete: Cascade)
+
+  @@map("error_notifications")
 }
 
 model Idl {

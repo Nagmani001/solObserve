@@ -16,7 +16,7 @@ use solobserve_config::Config;
 use solobserve_storage::{
     clickhouse_client, nats_jetstream, pg_pool, run_clickhouse_migrations, s3_client,
 };
-use solobserve_types::{RawAccountMsg, RawTxMsg};
+use solobserve_types::{DecodedFailureMsg, RawAccountMsg, RawTxMsg};
 use sqlx::{PgPool, Row as SqlxRow};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
@@ -25,6 +25,12 @@ static INVOKE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^Program (\w+) invoke \[(\d+)\]").expect("invoke regex"));
 static CU_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^Program (\w+) consumed (\d+) of (\d+) compute units").expect("cu regex")
+});
+static ANCHOR_CONSTRAINT_RE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"AnchorError caused by account: ([^.]+)\. Error Code: ([^.]+)\. Error Number: (\d+)\. Error Message: (.+)",
+    )
+    .expect("anchor constraint regex")
 });
 
 #[derive(Row, Serialize)]
@@ -222,6 +228,7 @@ async fn main() -> Result<()> {
 
     let tx_loop = run_tx_loop(
         tx_consumer,
+        js.clone(),
         ch.clone(),
         pg.clone(),
         s3.clone(),
@@ -286,6 +293,7 @@ fn spawn_metrics_server(metrics: Metrics) {
 
 async fn run_tx_loop(
     consumer: jetstream::consumer::Consumer<jetstream::consumer::pull::Config>,
+    js: jetstream::Context,
     ch: clickhouse::Client,
     pg: PgPool,
     s3: aws_sdk_s3::Client,
@@ -339,7 +347,7 @@ async fn run_tx_loop(
                 message.ack().await.ok();
                 continue;
             }
-            match decode_tx_message(&ch, &pg, &s3, &bucket, &registry, &raw, &metrics).await {
+            match decode_tx_message(&ch, &js, &pg, &s3, &bucket, &registry, &raw, &metrics).await {
                 Ok(_) => {
                     metrics.consumed.with_label_values(&["raw_tx"]).inc();
                 }
@@ -366,6 +374,7 @@ async fn run_tx_loop(
 
 async fn decode_tx_message(
     ch: &clickhouse::Client,
+    js: &jetstream::Context,
     _pg: &PgPool,
     s3: &aws_sdk_s3::Client,
     bucket: &str,
@@ -401,6 +410,7 @@ async fn decode_tx_message(
         .collect::<Vec<_>>();
     let account_keys = extract_account_keys(&json);
     let compiled_ixs = extract_compiled_instructions(&json, &account_keys);
+    let constraint_context = extract_anchor_constraint(&logs);
 
     let signer = json
         .pointer("/transaction/message/accountKeys/0")
@@ -634,6 +644,30 @@ async fn decode_tx_message(
     }
     ix_insert.end().await?;
 
+    if status == "failed" {
+        for r in &ix_rows {
+            let msg = DecodedFailureMsg {
+                cluster: raw.cluster.clone(),
+                program_id: raw.program_id.clone(),
+                signature: raw.signature.clone(),
+                slot: raw.slot,
+                block_time: raw.block_time,
+                signer: tx_row.signer.clone(),
+                instruction_name: r.instruction_name.clone(),
+                error_code: tx_row.error_code,
+                error_name: tx_row.error_name.clone(),
+                args_json: serde_json::from_str(&r.args_json).unwrap_or(Value::Null),
+                log_lines: logs.clone(),
+                constraint_kind: constraint_context.as_ref().map(|c| c.error_code.clone()),
+                constraint_account: constraint_context.as_ref().map(|c| c.account.clone()),
+                constraint_message: constraint_context.as_ref().map(|c| c.message.clone()),
+                cu_consumed: Some(compute_budget_consumed),
+            };
+            let subject = format!("decoded.failures.{}.{}", raw.cluster, raw.program_id);
+            js.publish(subject, serde_json::to_vec(&msg)?.into()).await.ok();
+        }
+    }
+
     let mut ev_insert = ch.insert("events")?;
     for e in &event_rows {
         ev_insert.write(e).await?;
@@ -652,6 +686,35 @@ fn parse_instruction_name_from_log(logs: &[String], invoke_index: usize) -> Opti
     for line in logs.iter().skip(invoke_index).take(4) {
         if let Some(name) = line.strip_prefix("Program log: Instruction: ") {
             return Some(name.trim().to_string());
+        }
+    }
+    None
+}
+
+#[derive(Debug, Clone)]
+struct AnchorConstraintContext {
+    account: String,
+    error_code: String,
+    message: String,
+}
+
+fn extract_anchor_constraint(logs: &[String]) -> Option<AnchorConstraintContext> {
+    for line in logs {
+        if let Some(cap) = ANCHOR_CONSTRAINT_RE.captures(line) {
+            return Some(AnchorConstraintContext {
+                account: cap
+                    .get(1)
+                    .map(|m| m.as_str().trim().to_string())
+                    .unwrap_or_default(),
+                error_code: cap
+                    .get(2)
+                    .map(|m| m.as_str().trim().to_string())
+                    .unwrap_or_default(),
+                message: cap
+                    .get(4)
+                    .map(|m| m.as_str().trim().to_string())
+                    .unwrap_or_default(),
+            });
         }
     }
     None
@@ -1050,5 +1113,15 @@ mod tests {
         ];
         let name = parse_instruction_name_from_log(&logs, 0);
         assert_eq!(name.as_deref(), Some("deposit"));
+    }
+
+    #[test]
+    fn parses_anchor_constraint_line() {
+        let logs = vec![
+            "Program log: AnchorError caused by account: authority. Error Code: ConstraintHasOne. Error Number: 2001. Error Message: A has one constraint was violated.".to_string(),
+        ];
+        let parsed = extract_anchor_constraint(&logs).expect("should parse");
+        assert_eq!(parsed.account, "authority");
+        assert_eq!(parsed.error_code, "ConstraintHasOne");
     }
 }

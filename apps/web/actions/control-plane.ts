@@ -442,3 +442,100 @@ export async function getPlatformHealth(programId: string) {
   );
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function getErrorIssues(programId: string, status?: string) {
+  const q = new URLSearchParams();
+  if (status) q.set("status", status);
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  const res = await authedBackendFetch(`/v1/programs/${programId}/errors${suffix}`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getErrorIssueDetail(programId: string, issueId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/errors/${issueId}`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function updateErrorIssue(
+  programId: string,
+  issueId: string,
+  input: {
+    status?: "open" | "acknowledged" | "resolved" | "muted";
+    assignee_user_id?: string | null;
+    mute_hours?: number;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/errors/${issueId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function addErrorComment(programId: string, issueId: string, body: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/errors/${issueId}/comments`,
+    {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function listStateAccounts(programId: string, q?: string, type?: string) {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (type) params.set("type", type);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/state/accounts${suffix}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getStateHistory(
+  programId: string,
+  account: string,
+  input: { from_slot?: number; to_slot?: number; limit?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (input.from_slot) params.set("from_slot", String(input.from_slot));
+  if (input.to_slot) params.set("to_slot", String(input.to_slot));
+  if (input.limit) params.set("limit", String(input.limit));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/state/${account}/history${suffix}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getStateAtSlot(
+  programId: string,
+  account: string,
+  slot?: number,
+) {
+  const suffix = slot ? `?slot=${slot}` : "";
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/state/${account}${suffix}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createFieldWatch(
+  programId: string,
+  input: { account: string; field_path: string; op?: string; threshold_numeric?: number },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/state/field-watch`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}

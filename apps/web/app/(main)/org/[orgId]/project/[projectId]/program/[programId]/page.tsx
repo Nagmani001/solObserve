@@ -12,6 +12,8 @@ import { IngestionPanel } from "@/components/ingestion-panel";
 import { RawStreamPanel } from "@/components/raw-stream-panel";
 import { DashboardWorkspace } from "@/components/dashboard-workspace";
 import { PlatformHealthPanel } from "@/components/platform-health-panel";
+import { ErrorsPanel } from "@/components/errors-panel";
+import { StatePanel } from "@/components/state-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -74,6 +76,7 @@ export default async function ProgramHomePage({
           )}
           <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
+          <TabsTrigger value="state">State</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -111,10 +114,10 @@ export default async function ProgramHomePage({
           </div>
         </TabsContent>
         <TabsContent value="errors" className="mt-6">
-          <EmptyState
-            title="Errors"
-            description="Decoder anomalies and Anchor custom errors populate here once decoding is wired."
-          />
+          <ErrorsPanel programId={program.id} />
+        </TabsContent>
+        <TabsContent value="state" className="mt-6">
+          <StatePanel programId={program.id} />
         </TabsContent>
         <TabsContent value="alerts" className="mt-6">
           <EmptyState

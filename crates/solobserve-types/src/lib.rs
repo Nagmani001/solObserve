@@ -37,6 +37,25 @@ pub struct IngestControlMsg {
     pub hours: Option<i32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecodedFailureMsg {
+    pub cluster: String,
+    pub program_id: String,
+    pub signature: String,
+    pub slot: u64,
+    pub block_time: Option<i64>,
+    pub signer: String,
+    pub instruction_name: String,
+    pub error_code: Option<i32>,
+    pub error_name: Option<String>,
+    pub args_json: serde_json::Value,
+    pub log_lines: Vec<String>,
+    pub constraint_kind: Option<String>,
+    pub constraint_account: Option<String>,
+    pub constraint_message: Option<String>,
+    pub cu_consumed: Option<u32>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
