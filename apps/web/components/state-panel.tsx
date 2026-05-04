@@ -26,7 +26,9 @@ function simpleDiff(
   prev: Record<string, unknown>,
   curr: Record<string, unknown>,
 ): Array<{ field: string; before: string; after: string }> {
-  const keys = Array.from(new Set([...Object.keys(prev), ...Object.keys(curr)]));
+  const keys = Array.from(
+    new Set([...Object.keys(prev), ...Object.keys(curr)]),
+  );
   return keys
     .filter((k) => JSON.stringify(prev[k]) !== JSON.stringify(curr[k]))
     .map((k) => ({
@@ -57,7 +59,7 @@ export function StatePanel({ programId }: { programId: string }) {
       const all = (r.deltas as DeltaRow[]) ?? [];
       setDeltas(all);
       if (all.length > 0) {
-        const latest = Number(all[all.length - 1].slot);
+        const latest = Number(all[all.length - 1]?.slot ?? 0);
         setSlot(latest);
       }
     });
@@ -66,8 +68,8 @@ export function StatePanel({ programId }: { programId: string }) {
   useEffect(() => {
     if (!account || !slot) return;
     getStateAtSlot(programId, account, slot).then((r) => {
-      const curr = ((r.row as { decodedJson?: Record<string, unknown> })?.decodedJson ??
-        {}) as Record<string, unknown>;
+      const curr = ((r.row as { decodedJson?: Record<string, unknown> })
+        ?.decodedJson ?? {}) as Record<string, unknown>;
       setStateAtSlot(curr);
     });
     const prevSlot = deltas
@@ -76,8 +78,8 @@ export function StatePanel({ programId }: { programId: string }) {
       .sort((a, b) => b - a)[0];
     if (prevSlot) {
       getStateAtSlot(programId, account, prevSlot).then((r) => {
-        const prev = ((r.row as { decodedJson?: Record<string, unknown> })?.decodedJson ??
-          {}) as Record<string, unknown>;
+        const prev = ((r.row as { decodedJson?: Record<string, unknown> })
+          ?.decodedJson ?? {}) as Record<string, unknown>;
         setPrevState(prev);
       });
     } else {
@@ -85,9 +87,14 @@ export function StatePanel({ programId }: { programId: string }) {
     }
   }, [programId, account, slot, deltas]);
 
-  const diffRows = useMemo(() => simpleDiff(prevState, stateAtSlot), [prevState, stateAtSlot]);
-  const minSlot = deltas.length ? Number(deltas[0].slot) : 0;
-  const maxSlot = deltas.length ? Number(deltas[deltas.length - 1].slot) : 0;
+  const diffRows = useMemo(
+    () => simpleDiff(prevState, stateAtSlot),
+    [prevState, stateAtSlot],
+  );
+  const minSlot = deltas.length ? Number(deltas[0]?.slot ?? 0) : 0;
+  const maxSlot = deltas.length
+    ? Number(deltas[deltas.length - 1]?.slot ?? 0)
+    : 0;
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -101,14 +108,20 @@ export function StatePanel({ programId }: { programId: string }) {
               onClick={() => setAccount(row.account)}
             >
               <div className="font-mono">{row.account}</div>
-              <div className="text-muted-foreground">{row.accountType ?? "unknown"}</div>
+              <div className="text-muted-foreground">
+                {row.accountType ?? "unknown"}
+              </div>
             </button>
           ))}
         </div>
       </div>
       <div className="space-y-3 rounded-md border p-4 lg:col-span-2">
         <h3 className="text-sm font-semibold">State Timeline</h3>
-        {!account && <p className="text-sm text-muted-foreground">Select an account to scrub state history.</p>}
+        {!account && (
+          <p className="text-sm text-muted-foreground">
+            Select an account to scrub state history.
+          </p>
+        )}
         {account && (
           <>
             <p className="font-mono text-xs">{account}</p>
@@ -120,13 +133,20 @@ export function StatePanel({ programId }: { programId: string }) {
               onChange={(e) => setSlot(Number(e.target.value))}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">Selected slot: {slot}</p>
+            <p className="text-xs text-muted-foreground">
+              Selected slot: {slot}
+            </p>
             <div className="rounded border">
               {diffRows.length === 0 ? (
-                <p className="p-3 text-xs text-muted-foreground">No field changes at this slot.</p>
+                <p className="p-3 text-xs text-muted-foreground">
+                  No field changes at this slot.
+                </p>
               ) : (
                 diffRows.map((d) => (
-                  <div key={d.field} className="grid grid-cols-3 gap-2 border-b p-2 text-xs">
+                  <div
+                    key={d.field}
+                    className="grid grid-cols-3 gap-2 border-b p-2 text-xs"
+                  >
                     <div className="font-medium">{d.field}</div>
                     <div className="text-red-600">{d.before}</div>
                     <div className="text-emerald-600">{d.after}</div>
@@ -135,7 +155,11 @@ export function StatePanel({ programId }: { programId: string }) {
               )}
             </div>
             <div className="flex gap-2">
-              <Input value={watchField} onChange={(e) => setWatchField(e.target.value)} placeholder="field path (e.g. size)" />
+              <Input
+                value={watchField}
+                onChange={(e) => setWatchField(e.target.value)}
+                placeholder="field path (e.g. size)"
+              />
               <Button
                 size="sm"
                 onClick={async () => {

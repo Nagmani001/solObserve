@@ -9,7 +9,6 @@ import {
 } from "@/actions/control-plane";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/components/select";
 
 type Issue = {
   id: string;
@@ -28,9 +27,11 @@ export function ErrorsPanel({ programId }: { programId: string }) {
   const [comment, setComment] = useState("");
 
   useEffect(() => {
-    getErrorIssues(programId, status === "all" ? undefined : status).then((r) => {
-      setIssues((r.issues as Issue[]) ?? []);
-    });
+    getErrorIssues(programId, status === "all" ? undefined : status).then(
+      (r) => {
+        setIssues((r.issues as Issue[]) ?? []);
+      },
+    );
   }, [programId, status]);
 
   useEffect(() => {
@@ -48,18 +49,17 @@ export function ErrorsPanel({ programId }: { programId: string }) {
       <div className="space-y-3 rounded-md border p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">Issues</h3>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="acknowledged">Acknowledged</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-              <SelectItem value="muted">Muted</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="w-40 rounded-md border bg-background px-2 py-1 text-sm"
+          >
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="acknowledged">Acknowledged</option>
+            <option value="resolved">Resolved</option>
+            <option value="muted">Muted</option>
+          </select>
         </div>
         <div className="space-y-2">
           {issues.map((issue) => (
@@ -69,10 +69,12 @@ export function ErrorsPanel({ programId }: { programId: string }) {
               onClick={() => setSelectedIssueId(issue.id)}
             >
               <div className="text-sm font-medium">
-                {(issue.instructionName ?? "Unknown")} : {issue.errorName ?? "UnknownError"}
+                {issue.instructionName ?? "Unknown"} :{" "}
+                {issue.errorName ?? "UnknownError"}
               </div>
               <div className="text-xs text-muted-foreground">
-                Count {issue.totalCount} · Last seen {new Date(issue.lastSeenAt).toLocaleString()}
+                Count {issue.totalCount} · Last seen{" "}
+                {new Date(issue.lastSeenAt).toLocaleString()}
               </div>
             </button>
           ))}
@@ -81,34 +83,80 @@ export function ErrorsPanel({ programId }: { programId: string }) {
       <div className="space-y-3 rounded-md border p-4">
         <h3 className="text-sm font-semibold">Issue Detail</h3>
         {!selectedIssueId && (
-          <p className="text-sm text-muted-foreground">Select an issue to inspect samples and workflow actions.</p>
+          <p className="text-sm text-muted-foreground">
+            Select an issue to inspect samples and workflow actions.
+          </p>
         )}
         {selectedIssueId && selected && (
           <>
             <div className="text-sm">
               <p className="font-medium">
-                {selected.instructionName ?? "Unknown"} : {selected.errorName ?? "UnknownError"}
+                {selected.instructionName ?? "Unknown"} :{" "}
+                {selected.errorName ?? "UnknownError"}
               </p>
               <p className="text-muted-foreground">Status: {selected.status}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => updateErrorIssue(programId, selectedIssueId, { status: "acknowledged" })}>Acknowledge</Button>
-              <Button size="sm" variant="outline" onClick={() => updateErrorIssue(programId, selectedIssueId, { status: "resolved" })}>Resolve</Button>
-              <Button size="sm" variant="outline" onClick={() => updateErrorIssue(programId, selectedIssueId, { status: "muted", mute_hours: 24 })}>Mute 24h</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  updateErrorIssue(programId, selectedIssueId, {
+                    status: "acknowledged",
+                  })
+                }
+              >
+                Acknowledge
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  updateErrorIssue(programId, selectedIssueId, {
+                    status: "resolved",
+                  })
+                }
+              >
+                Resolve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  updateErrorIssue(programId, selectedIssueId, {
+                    status: "muted",
+                    mute_hours: 24,
+                  })
+                }
+              >
+                Mute 24h
+              </Button>
             </div>
             <div className="space-y-2 text-xs">
               <p className="font-medium">Why did this fail?</p>
-              <pre className="max-h-52 overflow-auto rounded bg-muted p-2">{JSON.stringify(detail, null, 2)}</pre>
+              <pre className="max-h-52 overflow-auto rounded bg-muted p-2">
+                {JSON.stringify(detail, null, 2)}
+              </pre>
             </div>
             <div className="space-y-2">
-              <Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add comment" />
+              <Input
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Add comment"
+              />
               <Button
                 size="sm"
                 onClick={async () => {
                   if (!comment.trim()) return;
-                  await addErrorComment(programId, selectedIssueId, comment.trim());
+                  await addErrorComment(
+                    programId,
+                    selectedIssueId,
+                    comment.trim(),
+                  );
                   setComment("");
-                  setDetail(await getErrorIssueDetail(programId, selectedIssueId));
+                  setDetail(
+                    await getErrorIssueDetail(programId, selectedIssueId),
+                  );
                 }}
               >
                 Comment

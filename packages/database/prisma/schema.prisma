@@ -159,6 +159,7 @@ model SolobserveUser {
 
   orgMembers OrgMember[]
   idlsUploaded Idl[] @relation("IdlUploader")
+  errorComments ErrorComment[]
 
   @@unique([email])
   @@map("users")
@@ -364,6 +365,33 @@ model ErrorNotification {
   issue   ErrorIssue?   @relation(fields: [issueIdFk], references: [id], onDelete: Cascade)
 
   @@map("error_notifications")
+}
+
+model AccountState {
+  account     String        @id
+  programIdFk String        @map("program_id_fk") @db.Uuid
+  cluster     SolanaCluster
+  accountType String?       @map("account_type")
+  decodedJson Json          @map("decoded_json") @db.JsonB
+  slot        BigInt
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("account_state")
+}
+
+model AccountStateHistory {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account     String
+  programIdFk String        @map("program_id_fk") @db.Uuid
+  cluster     SolanaCluster
+  slot        BigInt
+  accountType String?       @map("account_type")
+  decodedJson Json          @map("decoded_json") @db.JsonB
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([account, slot])
+  @@index([programIdFk, slot(sort: Desc)])
+  @@map("account_state_history")
 }
 
 model Idl {
