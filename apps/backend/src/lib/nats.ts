@@ -10,6 +10,10 @@ async function getConn(): Promise<NatsConnection> {
   return connPromise;
 }
 
+export async function getNatsConnection(): Promise<NatsConnection> {
+  return getConn();
+}
+
 export async function getJetstream(): Promise<JetStreamClient> {
   const conn = await getConn();
   return conn.jetstream();

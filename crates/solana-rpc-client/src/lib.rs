@@ -6,6 +6,9 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Message;
+use futures::{SinkExt, StreamExt};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogsNotification {
@@ -394,6 +397,69 @@ impl SolanaRpcClient {
             }
         }
         Ok(out)
+    }
+
+    pub async fn logs_subscribe(
+        &self,
+        program_id: String,
+        commitment: String,
+    ) -> Result<mpsc::Receiver<LogsNotification>> {
+        let ep = self.choose_endpoint().await;
+        let ws_url = if ep.http_url.starts_with("https://") {
+            ep.http_url.replacen("https://", "wss://", 1)
+        } else if ep.http_url.starts_with("http://") {
+            ep.http_url.replacen("http://", "ws://", 1)
+        } else {
+            ep.http_url.clone()
+        };
+        let (ws, _) = tokio_tungstenite::connect_async(&ws_url).await?;
+        let (mut write, mut read) = ws.split();
+        let subscribe = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "logsSubscribe",
+            "params": [
+                { "mentions": [program_id] },
+                { "commitment": commitment }
+            ]
+        });
+        write
+            .send(Message::Text(subscribe.to_string()))
+            .await
+            .context("logsSubscribe send")?;
+        let (tx, rx) = mpsc::channel(512);
+        tokio::spawn(async move {
+            while let Some(msg) = read.next().await {
+                let Ok(msg) = msg else { break };
+                let Message::Text(txt) = msg else { continue };
+                let Ok(v): Result<Value, _> = serde_json::from_str(&txt) else {
+                    continue;
+                };
+                if v.get("method").and_then(|m| m.as_str()) != Some("logsNotification") {
+                    continue;
+                }
+                let sig = v
+                    .pointer("/params/result/value/signature")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let slot = v
+                    .pointer("/params/result/context/slot")
+                    .and_then(|x| x.as_u64())
+                    .unwrap_or(0);
+                if sig.is_empty() {
+                    continue;
+                }
+                let _ = tx
+                    .send(LogsNotification {
+                        signature: sig,
+                        slot,
+                        commitment: "processed".to_string(),
+                    })
+                    .await;
+            }
+        });
+        Ok(rx)
     }
 }
 

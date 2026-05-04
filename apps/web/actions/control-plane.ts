@@ -564,3 +564,37 @@ export async function createFieldWatch(
   );
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function searchProgramLogs(
+  programId: string,
+  input: {
+    q?: string;
+    filters?: Record<string, unknown>;
+    limit?: number;
+    cursor?: string;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/search`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getSavedSearches(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/searches`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createSavedSearch(
+  programId: string,
+  input: { name: string; query_json: Record<string, unknown>; pinned?: boolean },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/searches`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}

@@ -186,16 +186,39 @@ async fn run_program_worker(
     backfill_window(&pg, &js, &s3, bucket, &rpc, &cfg).await?;
 
     let pending: Arc<Mutex<HashMap<String, u64>>> = Arc::new(Mutex::new(HashMap::new()));
+    let mut ws_rx = rpc
+        .logs_subscribe(cfg.program_id.clone(), "processed".to_string())
+        .await
+        .ok();
 
     loop {
-        let logs = rpc
-            .poll_logs_like(
+        let logs = if let Some(rx) = ws_rx.as_mut() {
+            let mut ws_logs = Vec::new();
+            loop {
+                match tokio::time::timeout(Duration::from_millis(200), rx.recv()).await {
+                    Ok(Some(n)) => {
+                        ws_logs.push(n);
+                        if ws_logs.len() >= 100 {
+                            break;
+                        }
+                    }
+                    Ok(None) => {
+                        ws_rx = None;
+                        break;
+                    }
+                    Err(_) => break,
+                }
+            }
+            ws_logs
+        } else {
+            rpc.poll_logs_like(
                 cfg.program_id.clone(),
                 "processed".to_string(),
                 seen.clone(),
             )
             .await
-            .unwrap_or_default();
+            .unwrap_or_default()
+        };
         for n in logs {
             if let Err(e) = ingest_signature(
                 &pg,
@@ -231,7 +254,9 @@ async fn run_program_worker(
             .ok();
         promote_or_rollback(&pg, &js, &cfg, &pending, &rpc).await?;
         metrics::report_endpoint_health(&rpc.health_snapshot().await);
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        if ws_rx.is_none() {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
     }
 }
 

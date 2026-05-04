@@ -56,6 +56,21 @@ pub struct DecodedFailureMsg {
     pub cu_consumed: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DecodedLiveMsg {
+    pub cluster: String,
+    pub program_id: String,
+    pub signature: String,
+    pub slot: u64,
+    pub block_time: Option<i64>,
+    pub signer: String,
+    pub instruction_name: String,
+    pub status: String,
+    pub error_code: Option<i32>,
+    pub error_name: Option<String>,
+    pub log_lines: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

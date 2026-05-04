@@ -159,6 +159,7 @@ model SolobserveUser {
 
   orgMembers OrgMember[]
   idlsUploaded Idl[] @relation("IdlUploader")
+  savedSearches SavedSearch[]
   errorComments ErrorComment[]
 
   @@unique([email])
@@ -224,6 +225,7 @@ model SolanaProgram {
   errorIssues ErrorIssue[]
   fieldWatches PendingFieldWatch[]
   errorNotifications ErrorNotification[]
+  savedSearches SavedSearch[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
@@ -365,6 +367,21 @@ model ErrorNotification {
   issue   ErrorIssue?   @relation(fields: [issueIdFk], references: [id], onDelete: Cascade)
 
   @@map("error_notifications")
+}
+
+model SavedSearch {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  programIdFk String   @map("program_id_fk") @db.Uuid
+  name        String
+  queryJson   Json     @map("query_json") @db.JsonB
+  pinned      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    SolobserveUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  program SolanaProgram  @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@map("saved_searches")
 }
 
 model AccountState {

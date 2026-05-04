@@ -15,6 +15,8 @@ import { prisma } from "@repo/database/client";
 import { initEmail } from "@repo/email/email";
 import { Server } from "http";
 import { logger } from "./lib/logger";
+import { WebSocketServer } from "ws";
+import { getNatsConnection } from "./lib/nats";
 
 const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +70,20 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 });
 
 app.use("/v1/programs", solobserveAuthMiddleware, programsRouter);
+app.get("/v1/lookup", async (req: Request, res: Response) => {
+  const value = String(req.query.value || "").trim();
+  if (!value) return res.status(400).json({ error: "missing_value" });
+  if (/^[1-9A-HJ-NP-Za-km-z]{87,89}$/.test(value)) {
+    return res.json({ type: "signature", value });
+  }
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) {
+    return res.json({ type: "address", value });
+  }
+  if (/^\d+$/.test(value)) {
+    return res.json({ type: "number", value: Number(value) });
+  }
+  return res.json({ type: "text", value });
+});
 
 app.get("/error", (req: Request, res: Response) => {
   res.status(400).json({
@@ -102,6 +118,83 @@ function main() {
 
   server = app.listen(process.env.PORT, () => {
     logger.info({ port: process.env.PORT }, "backend listening");
+  });
+
+  const wss = new WebSocketServer({ noServer: true });
+  server.on("upgrade", async (request, socket, head) => {
+    const url = new URL(request.url || "", `http://${request.headers.host}`);
+    if (!url.pathname.match(/^\/v1\/programs\/[^/]+\/search\/stream$/)) {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  });
+
+  wss.on("connection", async (ws, request) => {
+    const url = new URL(request.url || "", `http://${request.headers.host}`);
+    const m = url.pathname.match(/^\/v1\/programs\/([^/]+)\/search\/stream$/);
+    if (!m) {
+      ws.close();
+      return;
+    }
+    const program = await prisma.solanaProgram.findUnique({ where: { id: m[1] } });
+    if (!program) {
+      ws.close();
+      return;
+    }
+    let filters: Record<string, unknown> = {};
+    const raw = url.searchParams.get("filters");
+    if (raw) {
+      try {
+        filters = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as Record<string, unknown>;
+      } catch {
+        filters = {};
+      }
+    }
+    const nc = await getNatsConnection();
+    const sub = nc.subscribe(`decoded.live.${program.cluster}.${program.programId}`);
+    const q = typeof filters.q === "string" ? filters.q.toLowerCase() : "";
+    let paused = false;
+    const buffer: Record<string, unknown>[] = [];
+    const maxBuffer = 200;
+
+    const sendLoop = (async () => {
+      for await (const msg of sub) {
+        if (ws.readyState !== 1) break;
+        const payload = JSON.parse(Buffer.from(msg.data).toString("utf8")) as Record<string, unknown>;
+        const lines = Array.isArray(payload.log_lines) ? (payload.log_lines as string[]) : [];
+        if (q && !lines.some((l) => l.toLowerCase().includes(q))) {
+          continue;
+        }
+        if (paused) {
+          buffer.push(payload);
+          if (buffer.length > maxBuffer) buffer.shift();
+          continue;
+        }
+        ws.send(JSON.stringify(payload));
+      }
+    })();
+
+    ws.on("message", (raw) => {
+      try {
+        const msg = JSON.parse(String(raw)) as { op?: string };
+        if (msg.op === "pause") paused = true;
+        if (msg.op === "resume") {
+          paused = false;
+          while (buffer.length && ws.readyState === 1) {
+            ws.send(JSON.stringify(buffer.shift()));
+          }
+        }
+      } catch {
+        // Ignore malformed client messages.
+      }
+    });
+    ws.on("close", () => {
+      sub.unsubscribe();
+    });
+    sendLoop.catch(() => sub.unsubscribe());
   });
 }
 main();

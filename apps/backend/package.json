@@ -25,6 +25,7 @@
     "@repo/dsl-wasm": "workspace:*",
     "@repo/email": "workspace:*",
     "@repo/idl-parser-wasm": "workspace:*",
+    "@clickhouse/client": "^1.12.1",
     "@solana/web3.js": "^1.98.4",
     "axios": "^1.13.5",
     "@anthropic-ai/sdk": "^0.55.0",
@@ -35,6 +36,7 @@
     "express": "^5.2.1",
     "nats": "^2.29.3",
     "pino": "^10.3.1",
+    "ws": "^8.18.3",
     "zod": "^3.25.0"
   }
 }

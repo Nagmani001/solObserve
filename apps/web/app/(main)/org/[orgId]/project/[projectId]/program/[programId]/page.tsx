@@ -14,6 +14,7 @@ import { DashboardWorkspace } from "@/components/dashboard-workspace";
 import { PlatformHealthPanel } from "@/components/platform-health-panel";
 import { ErrorsPanel } from "@/components/errors-panel";
 import { StatePanel } from "@/components/state-panel";
+import { LogsEventsPanel } from "@/components/logs-events-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -75,6 +76,7 @@ export default async function ProgramHomePage({
             <TabsTrigger value="raw">Raw Stream</TabsTrigger>
           )}
           <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
+          <TabsTrigger value="logs">Logs & Events</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
           <TabsTrigger value="state">State</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -112,6 +114,9 @@ export default async function ProgramHomePage({
                 <PlatformHealthPanel programId={program.id} />
               )}
           </div>
+        </TabsContent>
+        <TabsContent value="logs" className="mt-6">
+          <LogsEventsPanel programId={program.id} />
         </TabsContent>
         <TabsContent value="errors" className="mt-6">
           <ErrorsPanel programId={program.id} />

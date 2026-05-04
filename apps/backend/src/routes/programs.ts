@@ -131,6 +131,46 @@ const postFieldWatchBody = z.object({
   threshold_numeric: z.number().optional(),
 });
 
+const searchPredicateBody = z.object({
+  path: z.string().min(1),
+  op: z.enum(["=", "!=", ">", ">=", "<", "<="]),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
+const postSearchBody = z.object({
+  q: z.string().optional(),
+  filters: z
+    .object({
+      instruction: z.array(z.string()).optional(),
+      error_code: z.array(z.union([z.string(), z.number()])).optional(),
+      signer: z.string().optional(),
+      signature: z.string().optional(),
+      event_type: z.string().optional(),
+      slot_range: z
+        .object({
+          from: z.number().int().optional(),
+          to: z.number().int().optional(),
+        })
+        .optional(),
+      time_range: z
+        .object({
+          from: z.number().int().optional(),
+          to: z.number().int().optional(),
+        })
+        .optional(),
+      event_predicates: z.array(searchPredicateBody).optional(),
+    })
+    .default({}),
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+});
+
+const postSavedSearchBody = z.object({
+  name: z.string().min(1).max(120),
+  query_json: z.record(z.unknown()),
+  pinned: z.boolean().optional(),
+});
+
 export const programsRouter: ExpressRouter = Router();
 
 type AccessOk = { appUserId: string | null };
@@ -1661,6 +1701,207 @@ programsRouter.post("/:id/state/field-watch", async (req, res) => {
       row,
       message: "Field watch saved and will activate with alerting.",
     });
+});
+
+programsRouter.post("/:id/search", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postSearchBody.safeParse(req.body);
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const limit = parsed.data.limit ?? 50;
+  const f = parsed.data.filters ?? {};
+  const where: string[] = [
+    "l.program_id = {program_id:String}",
+    "l.cluster = {cluster:String}",
+    "l.signature NOT IN (SELECT signature FROM rollbacks WHERE program_id = {program_id:String})",
+  ];
+  const params: Record<string, string | number> = {
+    program_id: program.programId,
+    cluster: program.cluster,
+    limit,
+    q: parsed.data.q ?? "",
+  };
+  if (parsed.data.q) {
+    where.push(
+      "(positionCaseInsensitive(l.log_lines_concat, {q:String}) > 0 OR hasTokenCaseInsensitive(l.log_lines_concat, {q:String}))",
+    );
+  }
+  if (f.signer) {
+    where.push("l.signer = {signer:String}");
+    params.signer = f.signer;
+  }
+  if (f.signature) {
+    where.push("l.signature = {signature:String}");
+    params.signature = f.signature;
+  }
+  if (f.slot_range?.from) {
+    where.push("l.slot >= {from_slot:UInt64}");
+    params.from_slot = f.slot_range.from;
+  }
+  if (f.slot_range?.to) {
+    where.push("l.slot <= {to_slot:UInt64}");
+    params.to_slot = f.slot_range.to;
+  }
+  if (f.time_range?.from) {
+    where.push("l.block_time >= toDateTime({from_s:Int64})");
+    params.from_s = Math.floor(f.time_range.from / 1000);
+  }
+  if (f.time_range?.to) {
+    where.push("l.block_time <= toDateTime({to_s:Int64})");
+    params.to_s = Math.floor(f.time_range.to / 1000);
+  }
+  if (f.instruction?.length) {
+    where.push(
+      "l.signature IN (SELECT signature FROM instructions WHERE program_id = {program_id:String} AND instruction_name = {instruction:String})",
+    );
+    params.instruction = f.instruction[0];
+  }
+
+  const rows = await clickhouseQuery<Record<string, unknown>>({
+    sql: `
+      SELECT
+        l.slot,
+        l.block_time,
+        l.signature,
+        l.signer,
+        l.status,
+        any(i.instruction_name) AS instruction,
+        arrayFirst(x -> positionCaseInsensitive(x, {q:String}) > 0, l.log_lines) AS matched_line
+      FROM tx_logs l
+      LEFT JOIN instructions i ON i.signature = l.signature AND i.program_id = l.program_id
+      WHERE ${where.join(" AND ")}
+      GROUP BY l.slot, l.block_time, l.signature, l.signer, l.status, l.log_lines
+      ORDER BY l.slot DESC
+      LIMIT {limit:UInt32}
+    `,
+    params,
+  });
+
+  return res.json({ results: rows, next_cursor: null });
+});
+
+programsRouter.get("/:id/searches", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx || authCtx.kind === "api_key")
+    return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const rows = await prisma.savedSearch.findMany({
+    where: { programIdFk: program.id, userId: authCtx.appUserId },
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+  });
+  return res.json({ rows });
+});
+
+programsRouter.post("/:id/searches", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx || authCtx.kind === "api_key")
+    return res.status(401).json({ error: "unauthorized" });
+  const parsed = postSavedSearchBody.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const row = await prisma.savedSearch.create({
+    data: {
+      userId: authCtx.appUserId,
+      programIdFk: program.id,
+      name: parsed.data.name,
+      queryJson: parsed.data.query_json,
+      pinned: parsed.data.pinned ?? false,
+    },
+  });
+  return res.status(201).json({ row });
+});
+
+programsRouter.get("/:id/users/:signer", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const signer = req.params.signer;
+  const [activity, errors, stats] = await Promise.all([
+    clickhouseQuery({
+      sql: `
+      SELECT slot, block_time, signature, status, fee_lamports
+      FROM transactions
+      WHERE program_id = {program_id:String} AND cluster = {cluster:String} AND signer = {signer:String}
+      ORDER BY slot DESC LIMIT 100
+    `,
+      params: {
+        program_id: program.programId,
+        cluster: program.cluster,
+        signer,
+      },
+    }),
+    clickhouseQuery({
+      sql: `
+      SELECT error_name, count() AS count
+      FROM transactions
+      WHERE program_id = {program_id:String} AND cluster = {cluster:String} AND signer = {signer:String} AND status='failed'
+      GROUP BY error_name ORDER BY count DESC LIMIT 20
+    `,
+      params: {
+        program_id: program.programId,
+        cluster: program.cluster,
+        signer,
+      },
+    }),
+    clickhouseQuery({
+      sql: `
+      SELECT count() AS calls, sum(fee_lamports) AS fees
+      FROM transactions
+      WHERE program_id = {program_id:String} AND cluster = {cluster:String} AND signer = {signer:String}
+    `,
+      params: {
+        program_id: program.programId,
+        cluster: program.cluster,
+        signer,
+      },
+    }),
+  ]);
+  return res.json({ signer, activity, errors, stats: stats[0] ?? {} });
 });
 
 function defaultRpcForCluster(cluster: string): string {

@@ -16,7 +16,7 @@ use solobserve_config::Config;
 use solobserve_storage::{
     clickhouse_client, nats_jetstream, pg_pool, run_clickhouse_migrations, s3_client,
 };
-use solobserve_types::{DecodedFailureMsg, RawAccountMsg, RawTxMsg};
+use solobserve_types::{DecodedFailureMsg, DecodedLiveMsg, RawAccountMsg, RawTxMsg};
 use sqlx::{PgPool, Row as SqlxRow};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
@@ -118,6 +118,19 @@ struct AccountWriteRow {
     idl_version: u32,
 }
 
+#[derive(Row, Serialize)]
+struct TxLogRow {
+    cluster: String,
+    program_id: String,
+    signature: String,
+    slot: u64,
+    block_time: u32,
+    signer: String,
+    log_lines: Vec<String>,
+    log_lines_concat: String,
+    status: String,
+}
+
 #[derive(Clone)]
 struct Metrics {
     registry: Registry,
@@ -204,6 +217,7 @@ async fn main() -> Result<()> {
 
     let metrics = Metrics::new();
     spawn_metrics_server(metrics.clone());
+    ensure_derived_streams(&js).await?;
 
     let tx_stream = js.get_stream("RAW_TX").await?;
     let tx_consumer = tx_stream
@@ -247,6 +261,19 @@ async fn main() -> Result<()> {
     );
 
     tokio::try_join!(tx_loop, account_loop)?;
+    Ok(())
+}
+
+async fn ensure_derived_streams(js: &jetstream::Context) -> Result<()> {
+    if js.get_stream("DECODED_DERIVED").await.is_err() {
+        js.create_stream(jetstream::stream::Config {
+            name: "DECODED_DERIVED".to_string(),
+            subjects: vec!["decoded.live.*.*".to_string(), "decoded.failures.*.*".to_string()],
+            max_age: Duration::from_secs(7 * 24 * 60 * 60),
+            ..Default::default()
+        })
+        .await?;
+    }
     Ok(())
 }
 
@@ -679,6 +706,42 @@ async fn decode_tx_message(
         edge_insert.write(e).await?;
     }
     edge_insert.end().await?;
+
+    let mut log_insert = ch.insert("tx_logs")?;
+    log_insert
+        .write(&TxLogRow {
+            cluster: raw.cluster.clone(),
+            program_id: raw.program_id.clone(),
+            signature: raw.signature.clone(),
+            slot: raw.slot,
+            block_time: block_ts,
+            signer: tx_row.signer.clone(),
+            log_lines: logs.clone(),
+            log_lines_concat: logs.join("\n"),
+            status: status.clone(),
+        })
+        .await?;
+    log_insert.end().await?;
+
+    for r in &ix_rows {
+        let live_msg = DecodedLiveMsg {
+            cluster: raw.cluster.clone(),
+            program_id: raw.program_id.clone(),
+            signature: raw.signature.clone(),
+            slot: raw.slot,
+            block_time: raw.block_time,
+            signer: tx_row.signer.clone(),
+            instruction_name: r.instruction_name.clone(),
+            status: status.clone(),
+            error_code: tx_row.error_code,
+            error_name: tx_row.error_name.clone(),
+            log_lines: logs.clone(),
+        };
+        let live_subject = format!("decoded.live.{}.{}", raw.cluster, raw.program_id);
+        js.publish(live_subject, serde_json::to_vec(&live_msg)?.into())
+            .await
+            .ok();
+    }
     Ok(())
 }
 
