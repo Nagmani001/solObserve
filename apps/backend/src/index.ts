@@ -139,7 +139,9 @@ function main() {
       ws.close();
       return;
     }
-    const program = await prisma.solanaProgram.findUnique({ where: { id: m[1] } });
+    const program = await prisma.solanaProgram.findUnique({
+      where: { id: m[1] },
+    });
     if (!program) {
       ws.close();
       return;
@@ -148,13 +150,17 @@ function main() {
     const raw = url.searchParams.get("filters");
     if (raw) {
       try {
-        filters = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as Record<string, unknown>;
+        filters = JSON.parse(
+          Buffer.from(raw, "base64").toString("utf8"),
+        ) as Record<string, unknown>;
       } catch {
         filters = {};
       }
     }
     const nc = await getNatsConnection();
-    const sub = nc.subscribe(`decoded.live.${program.cluster}.${program.programId}`);
+    const sub = nc.subscribe(
+      `decoded.live.${program.cluster}.${program.programId}`,
+    );
     const q = typeof filters.q === "string" ? filters.q.toLowerCase() : "";
     let paused = false;
     const buffer: Record<string, unknown>[] = [];
@@ -163,8 +169,12 @@ function main() {
     const sendLoop = (async () => {
       for await (const msg of sub) {
         if (ws.readyState !== 1) break;
-        const payload = JSON.parse(Buffer.from(msg.data).toString("utf8")) as Record<string, unknown>;
-        const lines = Array.isArray(payload.log_lines) ? (payload.log_lines as string[]) : [];
+        const payload = JSON.parse(
+          Buffer.from(msg.data).toString("utf8"),
+        ) as Record<string, unknown>;
+        const lines = Array.isArray(payload.log_lines)
+          ? (payload.log_lines as string[])
+          : [];
         if (q && !lines.some((l) => l.toLowerCase().includes(q))) {
           continue;
         }

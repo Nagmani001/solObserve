@@ -590,7 +590,11 @@ export async function getSavedSearches(programId: string) {
 
 export async function createSavedSearch(
   programId: string,
-  input: { name: string; query_json: Record<string, unknown>; pinned?: boolean },
+  input: {
+    name: string;
+    query_json: Record<string, unknown>;
+    pinned?: boolean;
+  },
 ) {
   const res = await authedBackendFetch(`/v1/programs/${programId}/searches`, {
     method: "POST",

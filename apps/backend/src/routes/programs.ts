@@ -1695,12 +1695,10 @@ programsRouter.post("/:id/state/field-watch", async (req, res) => {
       createdByUserId: authCtx.appUserId,
     },
   });
-  return res
-    .status(201)
-    .json({
-      row,
-      message: "Field watch saved and will activate with alerting.",
-    });
+  return res.status(201).json({
+    row,
+    message: "Field watch saved and will activate with alerting.",
+  });
 });
 
 programsRouter.post("/:id/search", async (req, res) => {
@@ -1769,7 +1767,7 @@ programsRouter.post("/:id/search", async (req, res) => {
     where.push(
       "l.signature IN (SELECT signature FROM instructions WHERE program_id = {program_id:String} AND instruction_name = {instruction:String})",
     );
-    params.instruction = f.instruction[0];
+    params.instruction = f.instruction[0] ?? "";
   }
 
   const rows = await clickhouseQuery<Record<string, unknown>>({
@@ -1839,7 +1837,7 @@ programsRouter.post("/:id/searches", async (req, res) => {
       userId: authCtx.appUserId,
       programIdFk: program.id,
       name: parsed.data.name,
-      queryJson: parsed.data.query_json,
+      queryJson: parsed.data.query_json as object,
       pinned: parsed.data.pinned ?? false,
     },
   });
