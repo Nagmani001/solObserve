@@ -602,3 +602,102 @@ export async function createSavedSearch(
   });
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function getAlertRules(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/rules`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createAlertRule(
+  programId: string,
+  input: {
+    name: string;
+    kind: "dsl" | "template";
+    definition: Record<string, unknown>;
+    evaluation_interval_seconds?: number;
+    severity?: "info" | "warn" | "critical";
+    group_by?: string[];
+    enabled?: boolean;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/rules`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getAlertIncidents(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/incidents`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getAlertIncident(programId: string, incidentId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/alerts/incidents/${incidentId}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function alertIncidentAction(
+  programId: string,
+  incidentId: string,
+  input: { action: "ack" | "resolve" | "silence"; comment?: string },
+) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/alerts/incidents/${incidentId}/action`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getOrgChannels(orgId: string) {
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/channels`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createOrgChannel(
+  orgId: string,
+  input: { kind: string; name: string; config: Record<string, unknown> },
+) {
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/channels`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getOrgRoutes(orgId: string) {
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/routes`, { method: "GET" });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createOrgRoute(
+  orgId: string,
+  input: {
+    matchers?: Record<string, unknown>;
+    channel_ids?: string[];
+    severity_min?: "info" | "warn" | "critical";
+    group_wait_seconds?: number;
+    group_interval_seconds?: number;
+    repeat_interval_seconds?: number;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/routes`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getOrgOncall(orgId: string) {
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/oncall`, { method: "GET" });
+  return (await res.json()) as Record<string, unknown>;
+}

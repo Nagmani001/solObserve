@@ -11,6 +11,7 @@ import axios from "axios";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import { solobserveAuthMiddleware } from "./middlewares/solobserveAuth";
 import { programsRouter } from "./routes/programs";
+import { orgSettingsRouter } from "./routes/org-settings";
 import { prisma } from "@repo/database/client";
 import { initEmail } from "@repo/email/email";
 import { Server } from "http";
@@ -70,6 +71,7 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 });
 
 app.use("/v1/programs", solobserveAuthMiddleware, programsRouter);
+app.use("/v1/orgs", solobserveAuthMiddleware, orgSettingsRouter);
 app.get("/v1/lookup", async (req: Request, res: Response) => {
   const value = String(req.query.value || "").trim();
   if (!value) return res.status(400).json({ error: "missing_value" });

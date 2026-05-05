@@ -147,6 +147,62 @@ enum ErrorClassification {
   @@map("error_classification")
 }
 
+enum AlertRuleKind {
+  dsl
+  template
+
+  @@map("alert_rule_kind")
+}
+
+enum AlertSeverity {
+  info
+  warn
+  critical
+
+  @@map("alert_severity")
+}
+
+enum AlertStateStatus {
+  ok
+  pending
+  firing
+  stale
+
+  @@map("alert_state_status")
+}
+
+enum AlertIncidentStatus {
+  firing
+  acknowledged
+  resolved
+  silenced
+
+  @@map("alert_incident_status")
+}
+
+enum AlertIncidentEventKind {
+  fired
+  notified
+  acked
+  resolved
+  comment
+  related_tx
+  related_state
+
+  @@map("alert_incident_event_kind")
+}
+
+enum NotificationChannelKind {
+  slack
+  discord
+  email
+  webhook
+  pagerduty
+  telegram
+
+  @@map("notification_channel_kind")
+}
+
 // Control-plane tables migrated via sqlx (see crates/solobserve-storage/migrations). Do not prisma-migrate these.
 model SolobserveUser {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -160,6 +216,10 @@ model SolobserveUser {
   orgMembers OrgMember[]
   idlsUploaded Idl[] @relation("IdlUploader")
   savedSearches SavedSearch[]
+  alertRules AlertRule[] @relation("AlertRuleCreator")
+  alertIncidentsAcked AlertIncident[] @relation("AlertIncidentAcker")
+  alertSilencesCreated AlertSilence[] @relation("AlertSilenceCreator")
+  oncallShifts OncallShift[]
   errorComments ErrorComment[]
 
   @@unique([email])
@@ -175,6 +235,10 @@ model Org {
   members   OrgMember[]
   apiKeys   ApiKey[]
   auditLogs AuditLog[]
+  notificationChannels NotificationChannel[]
+  notificationRoutes NotificationRoute[]
+  oncallSchedules OncallSchedule[]
+  escalationPolicies EscalationPolicy[]
 
   @@map("orgs")
 }
@@ -226,6 +290,8 @@ model SolanaProgram {
   fieldWatches PendingFieldWatch[]
   errorNotifications ErrorNotification[]
   savedSearches SavedSearch[]
+  alertRules AlertRule[]
+  alertSilences AlertSilence[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
@@ -382,6 +448,153 @@ model SavedSearch {
   program SolanaProgram  @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
 
   @@map("saved_searches")
+}
+
+model AlertRule {
+  id                        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk               String        @map("program_id_fk") @db.Uuid
+  name                      String
+  kind                      AlertRuleKind
+  definition                Json          @db.JsonB
+  evaluationIntervalSeconds Int           @map("evaluation_interval_seconds")
+  severity                  AlertSeverity
+  groupBy                   String[]      @map("group_by")
+  enabled                   Boolean       @default(true)
+  createdBy                 String?       @map("created_by") @db.Uuid
+  createdAt                 DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program   SolanaProgram    @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  creator   SolobserveUser?  @relation("AlertRuleCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  state     AlertRuleState?
+  incidents AlertIncident[]
+
+  @@map("alert_rules")
+}
+
+model AlertRuleState {
+  ruleId      String           @id @map("rule_id") @db.Uuid
+  lastEvalAt  DateTime?        @map("last_eval_at") @db.Timestamptz(6)
+  lastValue   Json?            @map("last_value") @db.JsonB
+  lastStatus  AlertStateStatus @default(ok) @map("last_status")
+  sinceTs     DateTime?        @map("since_ts") @db.Timestamptz(6)
+
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@map("alert_rule_state")
+}
+
+model AlertIncident {
+  id         String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruleIdFk   String              @map("rule_id_fk") @db.Uuid
+  fingerprint String
+  status     AlertIncidentStatus @default(firing)
+  severity   AlertSeverity
+  startedAt  DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
+  ackedAt    DateTime?           @map("acked_at") @db.Timestamptz(6)
+  resolvedAt DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  ackUserId  String?             @map("ack_user_id") @db.Uuid
+  summary    String
+  dedupKey   String              @map("dedup_key")
+
+  rule      AlertRule       @relation(fields: [ruleIdFk], references: [id], onDelete: Cascade)
+  ackUser   SolobserveUser? @relation("AlertIncidentAcker", fields: [ackUserId], references: [id], onDelete: SetNull)
+  events    AlertIncidentEvent[]
+
+  @@unique([ruleIdFk, dedupKey])
+  @@map("alert_incidents")
+}
+
+model AlertIncidentEvent {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentIdFk String                 @map("incident_id_fk") @db.Uuid
+  kind         AlertIncidentEventKind
+  payload      Json                   @db.JsonB
+  occurredAt   DateTime               @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  incident AlertIncident @relation(fields: [incidentIdFk], references: [id], onDelete: Cascade)
+
+  @@map("alert_incident_events")
+}
+
+model AlertSilence {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk String   @map("program_id_fk") @db.Uuid
+  matcher     Json     @db.JsonB
+  startsAt    DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt      DateTime @map("ends_at") @db.Timestamptz(6)
+  reason      String
+  createdBy   String?  @map("created_by") @db.Uuid
+
+  program SolanaProgram  @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  creator SolobserveUser? @relation("AlertSilenceCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@map("alert_silences")
+}
+
+model NotificationChannel {
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgIdFk        String                  @map("org_id_fk") @db.Uuid
+  kind           NotificationChannelKind
+  name           String
+  configEncrypted Bytes                  @map("config_encrypted")
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+
+  @@map("notification_channels")
+}
+
+model NotificationRoute {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgIdFk               String        @map("org_id_fk") @db.Uuid
+  matchers              Json          @db.JsonB
+  channelIds            String[]      @map("channel_ids") @db.Uuid
+  severityMin           AlertSeverity @map("severity_min")
+  groupWaitSeconds      Int           @map("group_wait_seconds")
+  groupIntervalSeconds  Int           @map("group_interval_seconds")
+  repeatIntervalSeconds Int           @map("repeat_interval_seconds")
+
+  org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+
+  @@map("notification_routes")
+}
+
+model OncallSchedule {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgIdFk  String   @map("org_id_fk") @db.Uuid
+  name     String
+  timezone String
+
+  org    Org           @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+  shifts OncallShift[]
+
+  @@map("oncall_schedules")
+}
+
+model OncallShift {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scheduleIdFk String   @map("schedule_id_fk") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  startsAt     DateTime @map("starts_at") @db.Timestamptz(6)
+  endsAt       DateTime @map("ends_at") @db.Timestamptz(6)
+  override     Boolean  @default(false)
+
+  schedule OncallSchedule @relation(fields: [scheduleIdFk], references: [id], onDelete: Cascade)
+  user     SolobserveUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("oncall_shifts")
+}
+
+model EscalationPolicy {
+  id      String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgIdFk String @map("org_id_fk") @db.Uuid
+  name    String
+  steps   Json   @db.JsonB
+
+  org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+
+  @@map("escalation_policies")
 }
 
 model AccountState {

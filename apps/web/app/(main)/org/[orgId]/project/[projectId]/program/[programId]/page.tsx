@@ -15,6 +15,7 @@ import { PlatformHealthPanel } from "@/components/platform-health-panel";
 import { ErrorsPanel } from "@/components/errors-panel";
 import { StatePanel } from "@/components/state-panel";
 import { LogsEventsPanel } from "@/components/logs-events-panel";
+import { AlertsPanel } from "@/components/alerts-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -125,10 +126,7 @@ export default async function ProgramHomePage({
           <StatePanel programId={program.id} />
         </TabsContent>
         <TabsContent value="alerts" className="mt-6">
-          <EmptyState
-            title="Alerts"
-            description="Alert rules and escalation ship with the alerter service (later plan)."
-          />
+          <AlertsPanel programId={program.id} />
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <EmptyState

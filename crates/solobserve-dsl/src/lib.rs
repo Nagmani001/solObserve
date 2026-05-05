@@ -409,6 +409,30 @@ fn compile_expr(
 
 fn metric_registry(name: &str) -> Option<MetricDef> {
     match name {
+        "latency_processed_to_confirmed_ms" => Some(MetricDef {
+            table: "(SELECT cp.program_id, cp.cluster, cp.signature, toDateTime(cp.observed_at_ms / 1000) AS observed_at, greatest(cp.observed_at_ms - toUnixTimestamp64Milli(t.block_time), 0) AS latency_ms, any(i.instruction_name) AS instruction_name FROM commitment_promotions cp LEFT JOIN transactions t ON t.signature = cp.signature AND t.program_id = cp.program_id LEFT JOIN instructions i ON i.signature = cp.signature AND i.program_id = cp.program_id WHERE cp.commitment = 'confirmed' GROUP BY cp.program_id, cp.cluster, cp.signature, observed_at, latency_ms)",
+            time_col: "observed_at",
+            value_sql: "avg(latency_ms)",
+            kind: MetricKind::Gauge,
+            tdigest_col: None,
+            labels: &[("instruction", "instruction_name")],
+        }),
+        "latency_confirmed_to_finalized_ms" => Some(MetricDef {
+            table: "(SELECT c.program_id, c.cluster, c.signature, toDateTime(f.observed_at_ms / 1000) AS observed_at, greatest(f.observed_at_ms - c.observed_at_ms, 0) AS latency_ms, any(i.instruction_name) AS instruction_name FROM commitment_promotions c INNER JOIN commitment_promotions f ON f.signature = c.signature AND f.program_id = c.program_id AND f.commitment = 'finalized' LEFT JOIN instructions i ON i.signature = c.signature AND i.program_id = c.program_id WHERE c.commitment = 'confirmed' GROUP BY c.program_id, c.cluster, c.signature, observed_at, latency_ms)",
+            time_col: "observed_at",
+            value_sql: "avg(latency_ms)",
+            kind: MetricKind::Gauge,
+            tdigest_col: None,
+            labels: &[("instruction", "instruction_name")],
+        }),
+        "latency_wallclock_perceived_ms" => Some(MetricDef {
+            table: "(SELECT cp.program_id, cp.cluster, cp.signature, toDateTime(cp.observed_at_ms / 1000) AS observed_at, greatest(cp.observed_at_ms - toUnixTimestamp64Milli(t.block_time), 0) AS latency_ms, any(i.instruction_name) AS instruction_name FROM commitment_promotions cp LEFT JOIN transactions t ON t.signature = cp.signature AND t.program_id = cp.program_id LEFT JOIN instructions i ON i.signature = cp.signature AND i.program_id = cp.program_id WHERE cp.commitment IN ('confirmed', 'finalized') GROUP BY cp.program_id, cp.cluster, cp.signature, observed_at, latency_ms)",
+            time_col: "observed_at",
+            value_sql: "avg(latency_ms)",
+            kind: MetricKind::Gauge,
+            tdigest_col: None,
+            labels: &[("instruction", "instruction_name")],
+        }),
         "instruction_calls_total" => Some(MetricDef {
             table: "metrics_instruction_calls_minute",
             time_col: "minute",

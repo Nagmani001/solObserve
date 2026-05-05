@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireOrgRole } from "@/lib/rbac";
 import { InviteMemberForm } from "./settings-forms";
+import { AlertSettings } from "./alert-settings";
 
 export default async function OrgSettingsPage({
   params,
@@ -26,7 +27,10 @@ export default async function OrgSettingsPage({
       </div>
 
       {canInvite ? (
-        <InviteMemberForm orgId={orgId} />
+        <div className="space-y-6">
+          <InviteMemberForm orgId={orgId} />
+          <AlertSettings orgId={orgId} />
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">
           Only admins and owners can invite members.
