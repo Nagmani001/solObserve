@@ -185,11 +185,20 @@ enum AlertIncidentEventKind {
   notified
   acked
   resolved
+  silenced
   comment
   related_tx
   related_state
 
   @@map("alert_incident_event_kind")
+}
+
+enum AlertDeliveryStatus {
+  pending
+  sent
+  failed
+
+  @@map("alert_delivery_status")
 }
 
 enum NotificationChannelKind {
@@ -500,9 +509,29 @@ model AlertIncident {
   rule      AlertRule       @relation(fields: [ruleIdFk], references: [id], onDelete: Cascade)
   ackUser   SolobserveUser? @relation("AlertIncidentAcker", fields: [ackUserId], references: [id], onDelete: SetNull)
   events    AlertIncidentEvent[]
+  deliveries AlertNotificationDelivery[]
 
   @@unique([ruleIdFk, dedupKey])
   @@map("alert_incidents")
+}
+
+model AlertNotificationDelivery {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentIdFk   String              @map("incident_id_fk") @db.Uuid
+  routeIdFk      String?             @map("route_id_fk") @db.Uuid
+  channelIdFk    String?             @map("channel_id_fk") @db.Uuid
+  idempotencyKey String              @unique @map("idempotency_key")
+  status         AlertDeliveryStatus @default(pending)
+  attempts       Int                 @default(0)
+  lastError      String?             @map("last_error")
+  nextAttemptAt  DateTime            @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  incident AlertIncident @relation(fields: [incidentIdFk], references: [id], onDelete: Cascade)
+  route    NotificationRoute? @relation(fields: [routeIdFk], references: [id], onDelete: SetNull)
+  channel  NotificationChannel? @relation(fields: [channelIdFk], references: [id], onDelete: SetNull)
+
+  @@map("alert_notification_deliveries")
 }
 
 model AlertIncidentEvent {
@@ -541,6 +570,7 @@ model NotificationChannel {
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
 
   org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+  deliveries AlertNotificationDelivery[]
 
   @@map("notification_channels")
 }
@@ -556,6 +586,7 @@ model NotificationRoute {
   repeatIntervalSeconds Int           @map("repeat_interval_seconds")
 
   org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+  deliveries AlertNotificationDelivery[]
 
   @@map("notification_routes")
 }

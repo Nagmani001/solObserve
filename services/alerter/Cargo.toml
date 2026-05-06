@@ -23,3 +23,5 @@ prometheus.workspace = true
 axum.workspace = true
 aes-gcm = "0.10"
 uuid.workspace = true
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls"] }
+hmac = "0.12"

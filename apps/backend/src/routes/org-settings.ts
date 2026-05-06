@@ -125,9 +125,23 @@ orgSettingsRouter.post(
       where: { id: req.params.channelId, orgIdFk: req.params.orgId },
     });
     if (!row) return res.status(404).json({ error: "not_found" });
+    const config = decryptChannelConfig(Buffer.from(row.configEncrypted));
+    const payload = {
+      title: "[test] SolObserve alert channel",
+      summary: "This is a channel test-send payload.",
+      severity: "info",
+    };
+    try {
+      await sendTestNotification(row.kind, config, payload);
+    } catch (e) {
+      return res.status(500).json({
+        error: "test_send_failed",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
     return res.json({
       ok: true,
-      message: `Test payload queued for ${row.kind}`,
+      message: `Test payload sent for ${row.kind}`,
     });
   },
 );
@@ -237,4 +251,65 @@ function normalizeKey(raw: string): Buffer {
   const out = Buffer.alloc(32);
   utf.copy(out);
   return out;
+}
+
+function decryptChannelConfig(data: Buffer): Record<string, unknown> {
+  const keyRaw = process.env.ALERT_ENCRYPTION_KEY || "";
+  if (!keyRaw || data.length < 28) return {};
+  const key = normalizeKey(keyRaw);
+  const iv = data.subarray(0, 12);
+  const tag = data.subarray(12, 28);
+  const enc = data.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  const plain = Buffer.concat([decipher.update(enc), decipher.final()]);
+  return JSON.parse(plain.toString("utf8")) as Record<string, unknown>;
+}
+
+async function sendTestNotification(
+  kind: string,
+  config: Record<string, unknown>,
+  payload: Record<string, unknown>,
+) {
+  if (kind === "slack" || kind === "discord" || kind === "webhook") {
+    const url = typeof config.url === "string" ? config.url : "";
+    if (!url) return;
+    await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return;
+  }
+  if (kind === "telegram") {
+    const token = typeof config.bot_token === "string" ? config.bot_token : "";
+    const chat = typeof config.chat_id === "string" ? config.chat_id : "";
+    if (!token || !chat) return;
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text: payload.summary }),
+    });
+    return;
+  }
+  if (kind === "pagerduty") {
+    const routingKey =
+      typeof config.routing_key === "string" ? config.routing_key : "";
+    if (!routingKey) return;
+    await fetch("https://events.pagerduty.com/v2/enqueue", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        routing_key: routingKey,
+        event_action: "trigger",
+        dedup_key: `test-${Date.now()}`,
+        payload: {
+          summary: payload.summary,
+          severity: "info",
+          source: "solobserve-test",
+        },
+      }),
+    });
+    return;
+  }
 }
