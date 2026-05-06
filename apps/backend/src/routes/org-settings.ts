@@ -32,7 +32,14 @@ async function assertOrgAccess(
 }
 
 const postChannelBody = z.object({
-  kind: z.enum(["slack", "discord", "email", "webhook", "pagerduty", "telegram"]),
+  kind: z.enum([
+    "slack",
+    "discord",
+    "email",
+    "webhook",
+    "pagerduty",
+    "telegram",
+  ]),
   name: z.string().min(1),
   config: z.record(z.unknown()),
 });
@@ -42,8 +49,18 @@ const postRouteBody = z.object({
   channel_ids: z.array(z.string().uuid()).default([]),
   severity_min: z.enum(["info", "warn", "critical"]).default("warn"),
   group_wait_seconds: z.number().int().min(1).max(3600).default(30),
-  group_interval_seconds: z.number().int().min(1).max(24 * 3600).default(300),
-  repeat_interval_seconds: z.number().int().min(1).max(14 * 24 * 3600).default(14400),
+  group_interval_seconds: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 3600)
+    .default(300),
+  repeat_interval_seconds: z
+    .number()
+    .int()
+    .min(1)
+    .max(14 * 24 * 3600)
+    .default(14400),
 });
 
 const postScheduleBody = z.object({
@@ -68,7 +85,12 @@ orgSettingsRouter.get("/:orgId/channels", async (req, res) => {
     orderBy: { createdAt: "desc" },
   });
   return res.json({
-    rows: rows.map((r) => ({ id: r.id, kind: r.kind, name: r.name, createdAt: r.createdAt })),
+    rows: rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      name: r.name,
+      createdAt: r.createdAt,
+    })),
   });
 });
 
@@ -84,30 +106,40 @@ orgSettingsRouter.post("/:orgId/channels", async (req, res) => {
       orgIdFk: req.params.orgId,
       kind: parsed.data.kind,
       name: parsed.data.name,
-      configEncrypted: encryptChannelConfig(parsed.data.config),
+      configEncrypted: new Uint8Array(encryptChannelConfig(parsed.data.config)),
     },
   });
-  return res.status(201).json({ row: { id: row.id, kind: row.kind, name: row.name } });
+  return res
+    .status(201)
+    .json({ row: { id: row.id, kind: row.kind, name: row.name } });
 });
 
-orgSettingsRouter.post("/:orgId/channels/:channelId/test-send", async (req, res) => {
-  const authCtx = req.solobserveAuth;
-  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
-  const access = await assertOrgAccess(authCtx, req.params.orgId, "admin");
-  if ("error" in access) return res.status(access.status).json(access.body);
-  const row = await prisma.notificationChannel.findFirst({
-    where: { id: req.params.channelId, orgIdFk: req.params.orgId },
-  });
-  if (!row) return res.status(404).json({ error: "not_found" });
-  return res.json({ ok: true, message: `Test payload queued for ${row.kind}` });
-});
+orgSettingsRouter.post(
+  "/:orgId/channels/:channelId/test-send",
+  async (req, res) => {
+    const authCtx = req.solobserveAuth;
+    if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+    const access = await assertOrgAccess(authCtx, req.params.orgId, "admin");
+    if ("error" in access) return res.status(access.status).json(access.body);
+    const row = await prisma.notificationChannel.findFirst({
+      where: { id: req.params.channelId, orgIdFk: req.params.orgId },
+    });
+    if (!row) return res.status(404).json({ error: "not_found" });
+    return res.json({
+      ok: true,
+      message: `Test payload queued for ${row.kind}`,
+    });
+  },
+);
 
 orgSettingsRouter.get("/:orgId/routes", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
   const access = await assertOrgAccess(authCtx, req.params.orgId, "admin");
   if ("error" in access) return res.status(access.status).json(access.body);
-  const rows = await prisma.notificationRoute.findMany({ where: { orgIdFk: req.params.orgId } });
+  const rows = await prisma.notificationRoute.findMany({
+    where: { orgIdFk: req.params.orgId },
+  });
   return res.json({ rows });
 });
 
@@ -121,7 +153,7 @@ orgSettingsRouter.post("/:orgId/routes", async (req, res) => {
   const row = await prisma.notificationRoute.create({
     data: {
       orgIdFk: req.params.orgId,
-      matchers: parsed.data.matchers,
+      matchers: parsed.data.matchers as object,
       channelIds: parsed.data.channel_ids,
       severityMin: parsed.data.severity_min,
       groupWaitSeconds: parsed.data.group_wait_seconds,
@@ -156,7 +188,11 @@ orgSettingsRouter.post("/:orgId/oncall/schedules", async (req, res) => {
   const parsed = postScheduleBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
   const row = await prisma.oncallSchedule.create({
-    data: { orgIdFk: req.params.orgId, name: parsed.data.name, timezone: parsed.data.timezone },
+    data: {
+      orgIdFk: req.params.orgId,
+      name: parsed.data.name,
+      timezone: parsed.data.timezone,
+    },
   });
   return res.status(201).json({ row });
 });
@@ -169,7 +205,11 @@ orgSettingsRouter.post("/:orgId/oncall/escalations", async (req, res) => {
   const parsed = postEscalationBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
   const row = await prisma.escalationPolicy.create({
-    data: { orgIdFk: req.params.orgId, name: parsed.data.name, steps: parsed.data.steps },
+    data: {
+      orgIdFk: req.params.orgId,
+      name: parsed.data.name,
+      steps: parsed.data.steps as object,
+    },
   });
   return res.status(201).json({ row });
 });

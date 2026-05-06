@@ -12,8 +12,12 @@ import {
 } from "@/actions/control-plane";
 
 export function AlertSettings({ orgId }: { orgId: string }) {
-  const [channels, setChannels] = useState<Array<{ id: string; kind: string; name: string }>>([]);
-  const [routes, setRoutes] = useState<Array<{ id: string; severityMin: string; channelIds: string[] }>>([]);
+  const [channels, setChannels] = useState<
+    Array<{ id: string; kind: string; name: string }>
+  >([]);
+  const [routes, setRoutes] = useState<
+    Array<{ id: string; severityMin: string; channelIds: string[] }>
+  >([]);
   const [oncall, setOncall] = useState<Record<string, unknown> | null>(null);
   const [channelKind, setChannelKind] = useState("slack");
   const [channelName, setChannelName] = useState("");
@@ -25,8 +29,16 @@ export function AlertSettings({ orgId }: { orgId: string }) {
       getOrgRoutes(orgId),
       getOrgOncall(orgId),
     ]);
-    setChannels((c.rows as Array<{ id: string; kind: string; name: string }>) ?? []);
-    setRoutes((r.rows as Array<{ id: string; severityMin: string; channelIds: string[] }>) ?? []);
+    setChannels(
+      (c.rows as Array<{ id: string; kind: string; name: string }>) ?? [],
+    );
+    setRoutes(
+      (r.rows as Array<{
+        id: string;
+        severityMin: string;
+        channelIds: string[];
+      }>) ?? [],
+    );
     setOncall(o);
   }
 
@@ -91,9 +103,10 @@ export function AlertSettings({ orgId }: { orgId: string }) {
         <Button
           variant="outline"
           onClick={async () => {
-            if (!channels.length) return;
+            const first = channels[0];
+            if (!first) return;
             await createOrgRoute(orgId, {
-              channel_ids: [channels[0].id],
+              channel_ids: [first.id],
               severity_min: "warn",
               matchers: {},
             });

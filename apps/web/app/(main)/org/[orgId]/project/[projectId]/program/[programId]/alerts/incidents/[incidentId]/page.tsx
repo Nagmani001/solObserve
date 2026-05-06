@@ -40,9 +40,15 @@ export default async function AlertIncidentPage({
         {JSON.stringify(data, null, 2)}
       </pre>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm">Acknowledge</Button>
-        <Button variant="outline" size="sm">Resolve</Button>
-        <Button variant="outline" size="sm">Silence</Button>
+        <Button variant="outline" size="sm">
+          Acknowledge
+        </Button>
+        <Button variant="outline" size="sm">
+          Resolve
+        </Button>
+        <Button variant="outline" size="sm">
+          Silence
+        </Button>
       </div>
     </div>
   );

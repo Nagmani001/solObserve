@@ -604,9 +604,12 @@ export async function createSavedSearch(
 }
 
 export async function getAlertRules(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/rules`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/alerts/rules`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -622,17 +625,23 @@ export async function createAlertRule(
     enabled?: boolean;
   },
 ) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/rules`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/alerts/rules`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
 export async function getAlertIncidents(programId: string) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/alerts/incidents`, {
-    method: "GET",
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/alerts/incidents`,
+    {
+      method: "GET",
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -675,7 +684,9 @@ export async function createOrgChannel(
 }
 
 export async function getOrgRoutes(orgId: string) {
-  const res = await authedBackendFetch(`/v1/orgs/${orgId}/routes`, { method: "GET" });
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/routes`, {
+    method: "GET",
+  });
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -698,6 +709,8 @@ export async function createOrgRoute(
 }
 
 export async function getOrgOncall(orgId: string) {
-  const res = await authedBackendFetch(`/v1/orgs/${orgId}/oncall`, { method: "GET" });
+  const res = await authedBackendFetch(`/v1/orgs/${orgId}/oncall`, {
+    method: "GET",
+  });
   return (await res.json()) as Record<string, unknown>;
 }

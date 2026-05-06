@@ -1920,9 +1920,16 @@ programsRouter.get("/:id/users/:signer", async (req, res) => {
 programsRouter.get("/:id/alerts/rules", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
-  const program = await prisma.solanaProgram.findUnique({ where: { id: req.params.id }, include: { project: true } });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const rules = await prisma.alertRule.findMany({
     where: { programIdFk: program.id },
@@ -1934,19 +1941,30 @@ programsRouter.get("/:id/alerts/rules", async (req, res) => {
 
 programsRouter.post("/:id/alerts/rules", async (req, res) => {
   const authCtx = req.solobserveAuth;
-  if (!authCtx || authCtx.kind === "api_key") return res.status(401).json({ error: "unauthorized" });
+  if (!authCtx || authCtx.kind === "api_key")
+    return res.status(401).json({ error: "unauthorized" });
   const parsed = postAlertRuleBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "invalid_body", detail: parsed.error.flatten() });
-  const program = await prisma.solanaProgram.findUnique({ where: { id: req.params.id }, include: { project: true } });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "editor");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const row = await prisma.alertRule.create({
     data: {
       programIdFk: program.id,
       name: parsed.data.name,
       kind: parsed.data.kind,
-      definition: parsed.data.definition,
+      definition: parsed.data.definition as object,
       evaluationIntervalSeconds: parsed.data.evaluation_interval_seconds,
       severity: parsed.data.severity,
       groupBy: parsed.data.group_by,
@@ -1960,9 +1978,16 @@ programsRouter.post("/:id/alerts/rules", async (req, res) => {
 programsRouter.get("/:id/alerts/incidents", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
-  const program = await prisma.solanaProgram.findUnique({ where: { id: req.params.id }, include: { project: true } });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const incidents = await prisma.alertIncident.findMany({
     where: { rule: { programIdFk: program.id } },
@@ -1976,9 +2001,16 @@ programsRouter.get("/:id/alerts/incidents", async (req, res) => {
 programsRouter.get("/:id/alerts/incidents/:incidentId", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
-  const program = await prisma.solanaProgram.findUnique({ where: { id: req.params.id }, include: { project: true } });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
   if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
   if ("error" in access) return res.status(access.status).json(access.body);
   const incident = await prisma.alertIncident.findFirst({
     where: { id: req.params.incidentId, rule: { programIdFk: program.id } },
@@ -1988,61 +2020,82 @@ programsRouter.get("/:id/alerts/incidents/:incidentId", async (req, res) => {
   return res.json({ incident });
 });
 
-programsRouter.post("/:id/alerts/incidents/:incidentId/action", async (req, res) => {
-  const authCtx = req.solobserveAuth;
-  if (!authCtx || authCtx.kind === "api_key") return res.status(401).json({ error: "unauthorized" });
-  const parsed = postIncidentActionBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
-  const program = await prisma.solanaProgram.findUnique({ where: { id: req.params.id }, include: { project: true } });
-  if (!program) return res.status(404).json({ error: "not_found" });
-  const access = await assertOrgAccess(authCtx, program.project.orgId, "viewer");
-  if ("error" in access) return res.status(access.status).json(access.body);
-  const incident = await prisma.alertIncident.findFirst({
-    where: { id: req.params.incidentId, rule: { programIdFk: program.id } },
-  });
-  if (!incident) return res.status(404).json({ error: "not_found" });
-  if (parsed.data.action === "ack") {
-    await prisma.alertIncident.update({
-      where: { id: incident.id },
-      data: { status: "acknowledged", ackedAt: new Date(), ackUserId: authCtx.appUserId },
+programsRouter.post(
+  "/:id/alerts/incidents/:incidentId/action",
+  async (req, res) => {
+    const authCtx = req.solobserveAuth;
+    if (!authCtx || authCtx.kind === "api_key")
+      return res.status(401).json({ error: "unauthorized" });
+    const parsed = postIncidentActionBody.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "invalid_body" });
+    const program = await prisma.solanaProgram.findUnique({
+      where: { id: req.params.id },
+      include: { project: true },
     });
-    await prisma.alertIncidentEvent.create({
-      data: {
-        incidentIdFk: incident.id,
-        kind: "acked",
-        payload: { by: authCtx.appUserId, comment: parsed.data.comment ?? null },
-      },
+    if (!program) return res.status(404).json({ error: "not_found" });
+    const access = await assertOrgAccess(
+      authCtx,
+      program.project.orgId,
+      "viewer",
+    );
+    if ("error" in access) return res.status(access.status).json(access.body);
+    const incident = await prisma.alertIncident.findFirst({
+      where: { id: req.params.incidentId, rule: { programIdFk: program.id } },
     });
-  } else if (parsed.data.action === "resolve") {
-    await prisma.alertIncident.update({
-      where: { id: incident.id },
-      data: { status: "resolved", resolvedAt: new Date() },
-    });
-    await prisma.alertIncidentEvent.create({
-      data: {
-        incidentIdFk: incident.id,
-        kind: "resolved",
-        payload: { by: authCtx.appUserId, comment: parsed.data.comment ?? null },
-      },
-    });
-  } else if (parsed.data.action === "silence") {
-    await prisma.alertIncident.update({
-      where: { id: incident.id },
-      data: { status: "silenced" },
-    });
-    await prisma.alertSilence.create({
-      data: {
-        programIdFk: program.id,
-        matcher: { incident_id: incident.id },
-        startsAt: new Date(),
-        endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        reason: parsed.data.comment ?? "silenced from incident page",
-        createdBy: authCtx.appUserId,
-      },
-    });
-  }
-  return res.json({ ok: true });
-});
+    if (!incident) return res.status(404).json({ error: "not_found" });
+    if (parsed.data.action === "ack") {
+      await prisma.alertIncident.update({
+        where: { id: incident.id },
+        data: {
+          status: "acknowledged",
+          ackedAt: new Date(),
+          ackUserId: authCtx.appUserId,
+        },
+      });
+      await prisma.alertIncidentEvent.create({
+        data: {
+          incidentIdFk: incident.id,
+          kind: "acked",
+          payload: {
+            by: authCtx.appUserId,
+            comment: parsed.data.comment ?? null,
+          },
+        },
+      });
+    } else if (parsed.data.action === "resolve") {
+      await prisma.alertIncident.update({
+        where: { id: incident.id },
+        data: { status: "resolved", resolvedAt: new Date() },
+      });
+      await prisma.alertIncidentEvent.create({
+        data: {
+          incidentIdFk: incident.id,
+          kind: "resolved",
+          payload: {
+            by: authCtx.appUserId,
+            comment: parsed.data.comment ?? null,
+          },
+        },
+      });
+    } else if (parsed.data.action === "silence") {
+      await prisma.alertIncident.update({
+        where: { id: incident.id },
+        data: { status: "silenced" },
+      });
+      await prisma.alertSilence.create({
+        data: {
+          programIdFk: program.id,
+          matcher: { incident_id: incident.id },
+          startsAt: new Date(),
+          endsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          reason: parsed.data.comment ?? "silenced from incident page",
+          createdBy: authCtx.appUserId,
+        },
+      });
+    }
+    return res.json({ ok: true });
+  },
+);
 
 function defaultRpcForCluster(cluster: string): string {
   if (cluster === "devnet") return "https://api.devnet.solana.com";
