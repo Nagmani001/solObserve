@@ -2547,11 +2547,16 @@ async function simulateReplay(
   const replayStatus =
     hasOverrides && originalStatus !== "success" ? "succeeded" : originalStatus;
   const originalCu = Number(tx.compute_budget_consumed ?? 0);
-  const cuDelta = hasOverrides ? Math.max(10, Math.floor(originalCu * 0.05)) : 0;
+  const cuDelta = hasOverrides
+    ? Math.max(10, Math.floor(originalCu * 0.05))
+    : 0;
   return {
     signature,
     status: replayStatus,
-    cu_consumed: Math.max(0, originalCu + (replayStatus === "succeeded" ? -cuDelta : 0)),
+    cu_consumed: Math.max(
+      0,
+      originalCu + (replayStatus === "succeeded" ? -cuDelta : 0),
+    ),
     logs: [
       "Replay started (simulation only, nothing sent on-chain).",
       `Base signature: ${signature}`,

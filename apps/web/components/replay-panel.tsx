@@ -38,7 +38,9 @@ export function ReplayPanel({ programId }: { programId: string }) {
     if (!signature.trim()) return;
     const out = await runReplay(programId, {
       signature: signature.trim(),
-      modifications: (mods ?? buildModifications()) as Array<Record<string, unknown>>,
+      modifications: (mods ?? buildModifications()) as Array<
+        Record<string, unknown>
+      >,
     });
     setResult(out);
   }
@@ -88,7 +90,9 @@ export function ReplayPanel({ programId }: { programId: string }) {
               await saveReplayScenario(programId, {
                 name: scenarioName.trim(),
                 base_signature: signature.trim(),
-                modifications: buildModifications() as Array<Record<string, unknown>>,
+                modifications: buildModifications() as Array<
+                  Record<string, unknown>
+                >,
                 share_with_team: true,
               });
               setScenarioName("");
