@@ -184,6 +184,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  replay:
+    image: rust:1.86
+    container_name: solobserve-replay
+    working_dir: /workspace
+    command: >
+      /bin/bash -lc "cargo run --manifest-path services/replay/Cargo.toml"
+    environment:
+      REPLAY_PORT: 9292
+      REPLAY_MAX_PARALLEL: 4
+    ports:
+      - "9292:9292"
+    volumes:
+      - ..:/workspace
+      - cargo-cache:/usr/local/cargo/registry
+      - target-cache:/workspace/target
+    restart: unless-stopped
+
 volumes:
   pgdata:
   chdata:

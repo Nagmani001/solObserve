@@ -850,17 +850,23 @@ fn extract_compiled_instructions(json: &Value, account_keys: &[String]) -> Vec<C
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
-    let mut next_idx = 1000u16;
     for group in inner {
         let parent = group
             .get("index")
             .and_then(|v| v.as_u64())
             .map(|v| v as u16);
-        for ix in group
+        let depth = group
+            .get("stackHeight")
+            .and_then(|v| v.as_u64())
+            .map(|v| (v as u8).saturating_add(1))
+            .unwrap_or(2);
+        for (inner_ix_pos, ix) in group
             .get("instructions")
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default()
+            .into_iter()
+            .enumerate()
         {
             let program_id = ix
                 .get("programId")
@@ -880,11 +886,12 @@ fn extract_compiled_instructions(json: &Value, account_keys: &[String]) -> Vec<C
             out.push(CompiledIx {
                 program_id,
                 data,
-                ix_index: next_idx,
+                ix_index: parent
+                    .map(|p| p.saturating_mul(100).saturating_add(inner_ix_pos as u16))
+                    .unwrap_or(inner_ix_pos as u16),
                 parent_ix_index: parent,
-                depth: 2,
+                depth,
             });
-            next_idx = next_idx.saturating_add(1);
         }
     }
     out

@@ -14,6 +14,7 @@ members = [
     "crates/solobserve-config",
     "crates/idl-parser",
     "crates/solobserve-dsl",
+    "crates/replay-core",
 ]
 
 [workspace.package]
@@ -58,6 +59,7 @@ solana-rpc-client = { path = "crates/solana-rpc-client" }
 schema-registry = { path = "crates/schema-registry" }
 idl-parser = { path = "crates/idl-parser" }
 solobserve-dsl = { path = "crates/solobserve-dsl" }
+replay-core = { path = "crates/replay-core" }
 
 [profile.release]
 lto = "thin"

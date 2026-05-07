@@ -201,6 +201,16 @@ enum AlertDeliveryStatus {
   @@map("alert_delivery_status")
 }
 
+enum ReplayRunStatus {
+  queued
+  running
+  succeeded
+  failed
+  timed_out
+
+  @@map("replay_run_status")
+}
+
 enum NotificationChannelKind {
   slack
   discord
@@ -301,10 +311,55 @@ model SolanaProgram {
   savedSearches SavedSearch[]
   alertRules AlertRule[]
   alertSilences AlertSilence[]
+  replayScenarios ReplayScenario[]
+  replayResults ReplayResult[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
   @@map("programs")
+}
+
+model ReplayScenario {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk   String   @map("program_id_fk") @db.Uuid
+  name          String
+  baseSignature String   @map("base_signature")
+  modifications Json     @db.JsonB
+  shareWithTeam Boolean  @default(false) @map("share_with_team")
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  results ReplayResult[]
+
+  @@index([programIdFk, updatedAt(sort: Desc)])
+  @@map("replay_scenarios")
+}
+
+model ReplayResult {
+  id                         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk                String          @map("program_id_fk") @db.Uuid
+  scenarioIdFk               String?         @map("scenario_id_fk") @db.Uuid
+  signature                  String
+  modificationsHash          String          @map("modifications_hash")
+  status                     ReplayRunStatus @default(queued)
+  cuConsumed                 BigInt?         @map("cu_consumed")
+  logs                       Json            @db.JsonB
+  accountDiffs               Json            @map("account_diffs") @db.JsonB
+  decodedResult              Json?           @map("decoded_result") @db.JsonB
+  historicalStateUnavailable Boolean         @default(false) @map("historical_state_unavailable")
+  executedAt                 DateTime?       @map("executed_at") @db.Timestamptz(6)
+  executedBy                 String?         @map("executed_by") @db.Uuid
+  createdAt                  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program  SolanaProgram  @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  scenario ReplayScenario? @relation(fields: [scenarioIdFk], references: [id], onDelete: SetNull)
+
+  @@index([programIdFk, createdAt(sort: Desc)])
+  @@index([scenarioIdFk])
+  @@map("replay_results")
 }
 
 model Dashboard {

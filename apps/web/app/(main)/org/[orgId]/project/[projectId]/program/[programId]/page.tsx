@@ -16,6 +16,7 @@ import { ErrorsPanel } from "@/components/errors-panel";
 import { StatePanel } from "@/components/state-panel";
 import { LogsEventsPanel } from "@/components/logs-events-panel";
 import { AlertsPanel } from "@/components/alerts-panel";
+import { ReplayPanel } from "@/components/replay-panel";
 
 export default async function ProgramHomePage({
   params,
@@ -81,6 +82,7 @@ export default async function ProgramHomePage({
           <TabsTrigger value="errors">Errors</TabsTrigger>
           <TabsTrigger value="state">State</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="replay">Replay</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-6">
@@ -127,6 +129,9 @@ export default async function ProgramHomePage({
         </TabsContent>
         <TabsContent value="alerts" className="mt-6">
           <AlertsPanel programId={program.id} />
+        </TabsContent>
+        <TabsContent value="replay" className="mt-6">
+          <ReplayPanel programId={program.id} />
         </TabsContent>
         <TabsContent value="settings" className="mt-6">
           <EmptyState

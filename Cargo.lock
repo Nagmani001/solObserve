@@ -2734,10 +2734,25 @@ name = "replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "chrono",
+ "replay-core",
+ "serde",
+ "serde_json",
  "solobserve-config",
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "replay-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

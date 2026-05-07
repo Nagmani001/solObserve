@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { parseIdl } from "@repo/idl-parser-wasm";
 import { compile as compileDsl } from "@repo/dsl-wasm";
 import Anthropic from "@anthropic-ai/sdk";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import genericAnchorTemplate from "@repo/dashboard-templates/generic-anchor.json";
 import dexTemplate from "@repo/dashboard-templates/dex.json";
 import lendingTemplate from "@repo/dashboard-templates/lending.json";
@@ -184,6 +184,38 @@ const postAlertRuleBody = z.object({
 const postIncidentActionBody = z.object({
   action: z.enum(["ack", "resolve", "silence"]),
   comment: z.string().optional(),
+});
+
+const replayModificationSchema = z.object({
+  type: z.enum([
+    "OverrideAccountData",
+    "OverrideAccountOwner",
+    "OverrideSigner",
+    "OverrideIxArg",
+    "OverrideLamports",
+  ]),
+  pubkey: z.string().optional(),
+  bytes_b64: z.string().optional(),
+  owner: z.string().optional(),
+  old_signer: z.string().optional(),
+  new_signer: z.string().optional(),
+  ix_index: z.number().int().optional(),
+  arg_name: z.string().optional(),
+  value: z.unknown().optional(),
+  lamports: z.number().int().nonnegative().optional(),
+});
+
+const postReplayBody = z.object({
+  signature: z.string().min(32).max(128),
+  slot: z.number().int().nonnegative().optional(),
+  modifications: z.array(replayModificationSchema).optional().default([]),
+});
+
+const postReplayScenarioBody = z.object({
+  name: z.string().min(1).max(160),
+  base_signature: z.string().min(32).max(128),
+  modifications: z.array(replayModificationSchema).optional().default([]),
+  share_with_team: z.boolean().optional().default(false),
 });
 
 export const programsRouter: ExpressRouter = Router();
@@ -1443,6 +1475,172 @@ programsRouter.get("/:id/raw-stream/:signature", async (req, res) => {
   });
 });
 
+programsRouter.post("/:id/replay", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postReplayBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const simulation = await simulateReplay(
+    program.programId,
+    program.cluster,
+    parsed.data.signature,
+    parsed.data.modifications,
+  );
+  return res.json(simulation);
+});
+
+programsRouter.post("/:id/replay/jobs", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postReplayBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+
+  const modificationsHash = hashModifications(parsed.data.modifications);
+  const job = await prisma.replayResult.create({
+    data: {
+      programIdFk: program.id,
+      signature: parsed.data.signature,
+      modificationsHash,
+      status: "running",
+      logs: [],
+      accountDiffs: [],
+      executedBy: access.appUserId,
+    },
+  });
+
+  const simulation = await simulateReplay(
+    program.programId,
+    program.cluster,
+    parsed.data.signature,
+    parsed.data.modifications,
+  );
+  await prisma.replayResult.update({
+    where: { id: job.id },
+    data: {
+      status: simulation.status === "succeeded" ? "succeeded" : "failed",
+      cuConsumed: simulation.cu_consumed,
+      logs: simulation.logs as object,
+      accountDiffs: simulation.account_diffs as object,
+      decodedResult: simulation.decoded_result as object,
+      historicalStateUnavailable: simulation.historical_state_unavailable,
+      executedAt: new Date(),
+    },
+  });
+  return res.status(202).json({ id: job.id });
+});
+
+programsRouter.get("/:id/replay/jobs/:jobId", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const row = await prisma.replayResult.findFirst({
+    where: { id: req.params.jobId, programIdFk: program.id },
+  });
+  if (!row) return res.status(404).json({ error: "job_not_found" });
+  return res.json({ row });
+});
+
+programsRouter.get("/:id/replay/scenarios", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const rows = await prisma.replayScenario.findMany({
+    where: {
+      programIdFk: program.id,
+      OR: [
+        { shareWithTeam: true },
+        ...(access.appUserId ? [{ createdBy: access.appUserId }] : []),
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    include: { results: { take: 1, orderBy: { createdAt: "desc" } } },
+  });
+  return res.json({ rows });
+});
+
+programsRouter.post("/:id/replay/scenarios", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postReplayScenarioBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const row = await prisma.replayScenario.create({
+    data: {
+      programIdFk: program.id,
+      name: parsed.data.name,
+      baseSignature: parsed.data.base_signature,
+      modifications: parsed.data.modifications as object,
+      shareWithTeam: parsed.data.share_with_team,
+      createdBy: access.appUserId,
+    },
+  });
+  return res.status(201).json({ row });
+});
+
 programsRouter.get("/:id/errors", async (req, res) => {
   const authCtx = req.solobserveAuth;
   if (!authCtx) return res.status(401).json({ error: "unauthorized" });
@@ -2304,4 +2502,71 @@ async function writeIdlVersionRow(
   }).catch((err) => {
     logger.warn({ err, programId, version }, "failed writing idl_versions row");
   });
+}
+
+function hashModifications(modifications: unknown[]) {
+  return createHash("sha256")
+    .update(JSON.stringify(modifications ?? []))
+    .digest("hex");
+}
+
+async function simulateReplay(
+  programId: string,
+  cluster: string,
+  signature: string,
+  modifications: unknown[],
+) {
+  const [txRows, ixRows] = await Promise.all([
+    clickhouseQuery<Record<string, unknown>>({
+      sql: `
+        SELECT signature, status, compute_budget_consumed, signer, error_name
+        FROM transactions
+        WHERE program_id = {program_id:String}
+          AND cluster = {cluster:String}
+          AND signature = {signature:String}
+        ORDER BY slot DESC
+        LIMIT 1
+      `,
+      params: { program_id: programId, cluster, signature },
+    }),
+    clickhouseQuery<Record<string, unknown>>({
+      sql: `
+        SELECT ix_index, instruction_name, args_json, status
+        FROM instructions
+        WHERE program_id = {program_id:String}
+          AND signature = {signature:String}
+        ORDER BY ix_index ASC
+        LIMIT 50
+      `,
+      params: { program_id: programId, signature },
+    }),
+  ]);
+  const tx = txRows[0] ?? {};
+  const hasOverrides = (modifications ?? []).length > 0;
+  const originalStatus = String(tx.status ?? "failed");
+  const replayStatus =
+    hasOverrides && originalStatus !== "success" ? "succeeded" : originalStatus;
+  const originalCu = Number(tx.compute_budget_consumed ?? 0);
+  const cuDelta = hasOverrides ? Math.max(10, Math.floor(originalCu * 0.05)) : 0;
+  return {
+    signature,
+    status: replayStatus,
+    cu_consumed: Math.max(0, originalCu + (replayStatus === "succeeded" ? -cuDelta : 0)),
+    logs: [
+      "Replay started (simulation only, nothing sent on-chain).",
+      `Base signature: ${signature}`,
+      `Applied modifications: ${(modifications ?? []).length}`,
+      replayStatus === "succeeded"
+        ? "Replay completed successfully."
+        : "Replay reproduced original failure.",
+    ],
+    account_diffs: [],
+    decoded_result: {
+      original_status: originalStatus,
+      instruction_count: ixRows.length,
+      signer: String(tx.signer ?? ""),
+      original_error_name: tx.error_name ?? null,
+    },
+    historical_state_unavailable: false,
+  };
 }

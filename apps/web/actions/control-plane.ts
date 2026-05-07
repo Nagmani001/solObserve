@@ -714,3 +714,67 @@ export async function getOrgOncall(orgId: string) {
   });
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function runReplay(
+  programId: string,
+  input: {
+    signature: string;
+    slot?: number;
+    modifications?: Array<Record<string, unknown>>;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/replay`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function createReplayJob(
+  programId: string,
+  input: {
+    signature: string;
+    slot?: number;
+    modifications?: Array<Record<string, unknown>>;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/replay/jobs`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getReplayJob(programId: string, jobId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/replay/jobs/${jobId}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function listReplayScenarios(programId: string) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/replay/scenarios`, {
+    method: "GET",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function saveReplayScenario(
+  programId: string,
+  input: {
+    name: string;
+    base_signature: string;
+    modifications?: Array<Record<string, unknown>>;
+    share_with_team?: boolean;
+  },
+) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/replay/scenarios`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
