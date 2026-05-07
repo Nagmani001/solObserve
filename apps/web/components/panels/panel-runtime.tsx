@@ -20,6 +20,7 @@ import {
   runDashboardQuery,
 } from "@/actions/control-plane";
 import { getBackendUrl } from "@/lib/util";
+import { CPIWaterfall } from "./cpi-waterfall";
 
 type QueryPoint = [number, number];
 type QuerySeries = { labels: Record<string, string>; points: QueryPoint[] };
@@ -143,6 +144,7 @@ export function PanelRuntime({
           panelType={panel.panelType}
           series={data.series}
           options={panel.options}
+          programId={programId}
           onDrill={async (bucket) => {
             const res = await getRawStreamFiltered(programId, {
               from: bucket.from,
@@ -263,12 +265,14 @@ function PanelRenderer({
   panelType,
   series,
   options,
+  programId,
   onDrill,
   onTxClick,
 }: {
   panelType: string;
   series: QuerySeries[];
   options: Record<string, unknown>;
+  programId: string;
   onDrill: (bucket: {
     from: number;
     to: number;
@@ -276,6 +280,10 @@ function PanelRenderer({
   }) => void;
   onTxClick: (signature: string) => void;
 }) {
+  if (panelType === "cpi_tree") {
+    const signature = String(options.signature ?? "");
+    return <CPIWaterfall programId={programId} signature={signature} />;
+  }
   if (panelType === "single_stat") {
     const last = latestValue(series);
     const thresholds = Array.isArray(options.thresholds)
@@ -352,7 +360,6 @@ function PanelRenderer({
   if (
     panelType === "timeseries" ||
     panelType === "log_stream" ||
-    panelType === "cpi_tree" ||
     panelType === "state_snapshot"
   ) {
     return (

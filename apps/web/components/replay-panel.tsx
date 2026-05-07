@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  createReplayJob,
+  getReplayJob,
   listReplayScenarios,
   runReplay,
   saveReplayScenario,
@@ -22,6 +25,7 @@ export function ReplayPanel({ programId }: { programId: string }) {
   const [argName, setArgName] = useState("");
   const [argValue, setArgValue] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [scenarioName, setScenarioName] = useState("");
   const [scenarios, setScenarios] = useState<ReplayScenario[]>([]);
 
@@ -36,6 +40,11 @@ export function ReplayPanel({ programId }: { programId: string }) {
 
   async function onRun(mods?: unknown[]) {
     if (!signature.trim()) return;
+    if (argName.trim() && !argValue.trim()) {
+      setError("arg value is required when arg name is set");
+      return;
+    }
+    setError(null);
     const out = await runReplay(programId, {
       signature: signature.trim(),
       modifications: (mods ?? buildModifications()) as Array<
@@ -84,6 +93,25 @@ export function ReplayPanel({ programId }: { programId: string }) {
         <div className="flex gap-2">
           <Button onClick={() => onRun()}>Run replay</Button>
           <Button
+            variant="secondary"
+            onClick={async () => {
+              if (!signature.trim()) return;
+              const created = await createReplayJob(programId, {
+                signature: signature.trim(),
+                modifications: buildModifications() as Array<
+                  Record<string, unknown>
+                >,
+              });
+              const jobId = String(created.id ?? "");
+              if (jobId) {
+                const latest = await getReplayJob(programId, jobId);
+                setResult(latest);
+              }
+            }}
+          >
+            Queue job
+          </Button>
+          <Button
             variant="outline"
             onClick={async () => {
               if (!signature.trim() || !scenarioName.trim()) return;
@@ -107,6 +135,10 @@ export function ReplayPanel({ programId }: { programId: string }) {
           onChange={(e) => setScenarioName(e.target.value)}
           placeholder="Scenario name"
         />
+        {error && <p className="text-xs text-red-600">{error}</p>}
+        <Link className="text-xs underline" href={`/p/${programId}/replay/bulk`}>
+          Open bulk replay
+        </Link>
         {result && (
           <pre className="max-h-80 overflow-auto rounded bg-muted p-2 text-xs">
             {JSON.stringify(result, null, 2)}

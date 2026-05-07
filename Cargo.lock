@@ -2734,12 +2734,15 @@ name = "replay"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aws-sdk-s3",
  "axum",
  "chrono",
  "replay-core",
  "serde",
  "serde_json",
+ "solana-rpc-client",
  "solobserve-config",
+ "solobserve-storage",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2750,9 +2753,13 @@ name = "replay-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aws-sdk-s3",
+ "base64",
  "chrono",
  "serde",
  "serde_json",
+ "solana-rpc-client",
+ "tokio",
 ]
 
 [[package]]

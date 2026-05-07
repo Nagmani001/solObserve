@@ -784,3 +784,41 @@ export async function saveReplayScenario(
   );
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function searchTraces(
+  programId: string,
+  input: {
+    structural_pattern: { my_program_calls: string; with_amount_gt?: number };
+    time_range: { from: number; to: number };
+    limit?: number;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/traces/search`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function runBulkReplay(
+  programId: string,
+  input: {
+    filter: Record<string, unknown>;
+    max_jobs?: number;
+    modifications?: Array<Record<string, unknown>>;
+  },
+) {
+  const res = await authedBackendFetch(`/v1/programs/${programId}/replay/bulk`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function getBulkReplayStatus(programId: string, bulkId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/replay/bulk/${bulkId}`,
+    { method: "GET" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}

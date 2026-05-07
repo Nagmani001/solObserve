@@ -218,6 +218,38 @@ const postReplayScenarioBody = z.object({
   share_with_team: z.boolean().optional().default(false),
 });
 
+const postTraceSearchBody = z.object({
+  structural_pattern: z.object({
+    my_program_calls: z.string().min(1),
+    with_amount_gt: z.number().optional(),
+  }),
+  time_range: z.object({
+    from: z.number().int().positive(),
+    to: z.number().int().positive(),
+  }),
+  limit: z.number().int().min(1).max(100).optional().default(50),
+});
+
+const postBulkReplayBody = z.object({
+  filter: z.union([
+    z.object({
+      instruction_name: z.string().optional(),
+      status: z.string().optional(),
+      time_range: z
+        .object({
+          from: z.number().int().positive().optional(),
+          to: z.number().int().positive().optional(),
+        })
+        .optional(),
+    }),
+    z.object({
+      dsl: z.string().min(1),
+    }),
+  ]),
+  max_jobs: z.number().int().min(1).max(200).optional().default(50),
+  modifications: z.array(replayModificationSchema).optional().default([]),
+});
+
 export const programsRouter: ExpressRouter = Router();
 
 type AccessOk = { appUserId: string | null };
@@ -1495,12 +1527,28 @@ programsRouter.post("/:id/replay", async (req, res) => {
     "viewer",
   );
   if ("error" in access) return res.status(access.status).json(access.body);
-  const simulation = await simulateReplay(
-    program.programId,
-    program.cluster,
-    parsed.data.signature,
+  const idl = await prisma.idl.findFirst({
+    where: { programIdFk: program.id },
+    orderBy: { version: "desc" },
+    select: { parsedJson: true },
+  });
+  const validation = validateReplayModifications(
     parsed.data.modifications,
+    idl?.parsedJson ?? {},
   );
+  if (!validation.ok) {
+    return res.status(400).json({
+      error: "invalid_modification",
+      message: validation.message,
+    });
+  }
+  const simulation = await callReplayService({
+    program_id: program.programId,
+    cluster: program.cluster,
+    signature: parsed.data.signature,
+    slot: parsed.data.slot,
+    modifications: parsed.data.modifications,
+  });
   return res.json(simulation);
 });
 
@@ -1524,6 +1572,21 @@ programsRouter.post("/:id/replay/jobs", async (req, res) => {
     "editor",
   );
   if ("error" in access) return res.status(access.status).json(access.body);
+  const idl = await prisma.idl.findFirst({
+    where: { programIdFk: program.id },
+    orderBy: { version: "desc" },
+    select: { parsedJson: true },
+  });
+  const validation = validateReplayModifications(
+    parsed.data.modifications,
+    idl?.parsedJson ?? {},
+  );
+  if (!validation.ok) {
+    return res.status(400).json({
+      error: "invalid_modification",
+      message: validation.message,
+    });
+  }
 
   const modificationsHash = hashModifications(parsed.data.modifications);
   const job = await prisma.replayResult.create({
@@ -1538,12 +1601,13 @@ programsRouter.post("/:id/replay/jobs", async (req, res) => {
     },
   });
 
-  const simulation = await simulateReplay(
-    program.programId,
-    program.cluster,
-    parsed.data.signature,
-    parsed.data.modifications,
-  );
+  const simulation = await callReplayService({
+    program_id: program.programId,
+    cluster: program.cluster,
+    signature: parsed.data.signature,
+    slot: parsed.data.slot,
+    modifications: parsed.data.modifications,
+  });
   await prisma.replayResult.update({
     where: { id: job.id },
     data: {
@@ -1639,6 +1703,181 @@ programsRouter.post("/:id/replay/scenarios", async (req, res) => {
     },
   });
   return res.status(201).json({ row });
+});
+
+programsRouter.post("/:id/traces/search", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postTraceSearchBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const fromS = Math.floor(parsed.data.time_range.from / 1000);
+  const toS = Math.floor(parsed.data.time_range.to / 1000);
+  const amountJoin = parsed.data.structural_pattern.with_amount_gt
+    ? `JOIN events ev ON ev.signature = i.signature AND ev.program_id = i.program_id
+       AND JSONExtractFloat(ev.payload_json, 'amount') > {amount_gt:Float64}`
+    : "";
+  const rows = await clickhouseQuery({
+    sql: `
+      SELECT i.signature, i.slot, i.block_time, e.callee_program, e.cu_consumed, i.instruction_name
+      FROM cpi_edges e
+      JOIN instructions i ON i.signature = e.signature AND i.program_id = e.program_id
+      ${amountJoin}
+      WHERE e.program_id = {program_id:String}
+        AND e.callee_program = {callee:String}
+        AND i.block_time BETWEEN toDateTime({from_s:Int64}) AND toDateTime({to_s:Int64})
+        AND i.signature NOT IN (SELECT signature FROM rollbacks WHERE program_id = {program_id:String})
+      ORDER BY i.slot DESC
+      LIMIT {limit:UInt32}
+    `,
+    params: {
+      program_id: program.programId,
+      callee: parsed.data.structural_pattern.my_program_calls,
+      from_s: fromS,
+      to_s: toS,
+      limit: parsed.data.limit,
+      ...(parsed.data.structural_pattern.with_amount_gt
+        ? { amount_gt: parsed.data.structural_pattern.with_amount_gt }
+        : {}),
+    },
+  });
+  return res.json({ rows });
+});
+
+programsRouter.post("/:id/replay/bulk", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const parsed = postBulkReplayBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "invalid_body", detail: parsed.error.flatten() });
+  }
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const bulkId = randomBytes(12).toString("hex");
+  const filterObj = parsed.data.filter as Record<string, unknown>;
+  const rows = await clickhouseQuery<{ signature: string }>({
+    sql: `
+      SELECT DISTINCT signature
+      FROM instructions
+      WHERE program_id = {program_id:String}
+        ${typeof filterObj.instruction_name === "string" ? "AND instruction_name = {instruction_name:String}" : ""}
+      ORDER BY signature DESC
+      LIMIT {limit:UInt32}
+    `,
+    params: {
+      program_id: program.programId,
+      limit: parsed.data.max_jobs,
+      ...(typeof filterObj.instruction_name === "string"
+        ? { instruction_name: filterObj.instruction_name }
+        : {}),
+    },
+  });
+  const created = await prisma.$transaction(
+    rows.map((r) =>
+      prisma.replayResult.create({
+        data: {
+          programIdFk: program.id,
+          signature: r.signature,
+          modificationsHash: hashModifications(parsed.data.modifications),
+          status: "queued",
+          logs: [],
+          accountDiffs: [],
+          decodedResult: { bulk_id: bulkId } as object,
+          executedBy: access.appUserId,
+        },
+      }),
+    ),
+  );
+  for (const row of created) {
+    try {
+      const simulation = await callReplayService({
+        program_id: program.programId,
+        cluster: program.cluster,
+        signature: row.signature,
+        modifications: parsed.data.modifications,
+      });
+      await prisma.replayResult.update({
+        where: { id: row.id },
+        data: {
+          status: simulation.status === "succeeded" ? "succeeded" : "failed",
+          cuConsumed: simulation.cu_consumed,
+          logs: simulation.logs as object,
+          accountDiffs: simulation.account_diffs as object,
+          decodedResult: {
+            ...(simulation.decoded_result as object),
+            bulk_id: bulkId,
+            error_name: simulation.error_name ?? null,
+          },
+          historicalStateUnavailable: simulation.historical_state_unavailable,
+          executedAt: new Date(),
+        },
+      });
+    } catch {
+      await prisma.replayResult.update({
+        where: { id: row.id },
+        data: { status: "failed", executedAt: new Date() },
+      });
+    }
+  }
+  return res.status(202).json({ bulk_id: bulkId, queued: created.length });
+});
+
+programsRouter.get("/:id/replay/bulk/:bulkId", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const rows = await prisma.replayResult.findMany({
+    where: {
+      programIdFk: program.id,
+      decodedResult: { path: ["bulk_id"], equals: req.params.bulkId },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  });
+  const total = rows.length;
+  const completed = rows.filter((r) =>
+    ["succeeded", "failed", "timed_out"].includes(r.status),
+  ).length;
+  const byStatus = rows.reduce<Record<string, number>>((acc, r) => {
+    acc[r.status] = (acc[r.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  return res.json({ total, completed, by_status: byStatus, rows });
 });
 
 programsRouter.get("/:id/errors", async (req, res) => {
@@ -2510,68 +2749,119 @@ function hashModifications(modifications: unknown[]) {
     .digest("hex");
 }
 
-async function simulateReplay(
-  programId: string,
-  cluster: string,
-  signature: string,
-  modifications: unknown[],
-) {
-  const [txRows, ixRows] = await Promise.all([
-    clickhouseQuery<Record<string, unknown>>({
-      sql: `
-        SELECT signature, status, compute_budget_consumed, signer, error_name
-        FROM transactions
-        WHERE program_id = {program_id:String}
-          AND cluster = {cluster:String}
-          AND signature = {signature:String}
-        ORDER BY slot DESC
-        LIMIT 1
-      `,
-      params: { program_id: programId, cluster, signature },
-    }),
-    clickhouseQuery<Record<string, unknown>>({
-      sql: `
-        SELECT ix_index, instruction_name, args_json, status
-        FROM instructions
-        WHERE program_id = {program_id:String}
-          AND signature = {signature:String}
-        ORDER BY ix_index ASC
-        LIMIT 50
-      `,
-      params: { program_id: programId, signature },
-    }),
-  ]);
-  const tx = txRows[0] ?? {};
-  const hasOverrides = (modifications ?? []).length > 0;
-  const originalStatus = String(tx.status ?? "failed");
-  const replayStatus =
-    hasOverrides && originalStatus !== "success" ? "succeeded" : originalStatus;
-  const originalCu = Number(tx.compute_budget_consumed ?? 0);
-  const cuDelta = hasOverrides
-    ? Math.max(10, Math.floor(originalCu * 0.05))
-    : 0;
-  return {
-    signature,
-    status: replayStatus,
-    cu_consumed: Math.max(
-      0,
-      originalCu + (replayStatus === "succeeded" ? -cuDelta : 0),
-    ),
-    logs: [
-      "Replay started (simulation only, nothing sent on-chain).",
-      `Base signature: ${signature}`,
-      `Applied modifications: ${(modifications ?? []).length}`,
-      replayStatus === "succeeded"
-        ? "Replay completed successfully."
-        : "Replay reproduced original failure.",
-    ],
-    account_diffs: [],
-    decoded_result: {
-      original_status: originalStatus,
-      instruction_count: ixRows.length,
-      signer: String(tx.signer ?? ""),
-      original_error_name: tx.error_name ?? null,
-    },
-    historical_state_unavailable: false,
-  };
+async function callReplayService(payload: {
+  program_id: string;
+  cluster: string;
+  signature: string;
+  slot?: number;
+  modifications?: unknown[];
+}) {
+  const replayUrl = (process.env.REPLAY_URL || "http://localhost:9292").replace(
+    /\/$/,
+    "",
+  );
+  const r = await fetch(`${replayUrl}/replay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = (await r.json()) as Record<string, unknown>;
+  if (!r.ok) {
+    throw new Error(String(body.error ?? "replay_failed"));
+  }
+  return body;
+}
+
+function validateReplayModifications(
+  modifications: Array<Record<string, unknown>>,
+  parsedIdl: unknown,
+): { ok: boolean; message?: string } {
+  const idl = (parsedIdl ?? {}) as Record<string, unknown>;
+  const instructions = Array.isArray(idl.instructions)
+    ? (idl.instructions as Array<Record<string, unknown>>)
+    : [];
+  for (const mod of modifications ?? []) {
+    if (mod.type === "OverrideIxArg") {
+      const ixIndex = Number(mod.ix_index ?? -1);
+      const argName = String(mod.arg_name ?? "");
+      const value = mod.value;
+      if (!Number.isInteger(ixIndex) || ixIndex < 0) {
+        return { ok: false, message: "OverrideIxArg requires valid ix_index" };
+      }
+      const ix = instructions[ixIndex];
+      if (!ix) {
+        return { ok: false, message: `No instruction at ix_index=${ixIndex}` };
+      }
+      const args = Array.isArray(ix.args)
+        ? (ix.args as Array<Record<string, unknown>>)
+        : [];
+      const arg = args.find((a) => String(a.name ?? "") === argName);
+      if (!arg) {
+        return { ok: false, message: `Unknown argument '${argName}'` };
+      }
+      const ty = arg.type;
+      if (!validateIdlScalarValue(ty, value)) {
+        return {
+          ok: false,
+          message: `Value for ${argName} does not match IDL type`,
+        };
+      }
+    }
+    if (mod.type === "OverrideAccountOwner") {
+      const owner = String(mod.owner ?? "");
+      if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(owner)) {
+        return { ok: false, message: "OverrideAccountOwner owner is invalid" };
+      }
+    }
+    if (mod.type === "OverrideLamports") {
+      const lamports = Number(mod.lamports ?? -1);
+      if (!Number.isFinite(lamports) || lamports < 0) {
+        return { ok: false, message: "OverrideLamports requires lamports >= 0" };
+      }
+    }
+  }
+  return { ok: true };
+}
+
+function validateIdlScalarValue(typeShape: unknown, value: unknown): boolean {
+  if (typeof typeShape === "string") {
+    if (["u8", "u16", "u32", "u64", "u128"].includes(typeShape)) {
+      if (typeof value === "number") return Number.isFinite(value) && value >= 0;
+      if (typeof value === "string") return /^\d+$/.test(value);
+      return false;
+    }
+    if (["i8", "i16", "i32", "i64", "i128"].includes(typeShape)) {
+      if (typeof value === "number") return Number.isFinite(value);
+      if (typeof value === "string") return /^-?\d+$/.test(value);
+      return false;
+    }
+    if (typeShape === "bool") return typeof value === "boolean";
+    if (typeShape === "string") return typeof value === "string";
+    if (typeShape === "pubkey") {
+      return typeof value === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+    }
+    return true;
+  }
+  if (typeShape && typeof typeShape === "object") {
+    const shape = typeShape as Record<string, unknown>;
+    if ("option" in shape) {
+      return value === null || validateIdlScalarValue(shape.option, value);
+    }
+    if ("vec" in shape) {
+      return (
+        Array.isArray(value) &&
+        value.every((v) => validateIdlScalarValue(shape.vec, v))
+      );
+    }
+    if ("array" in shape) {
+      const tuple = Array.isArray(shape.array) ? shape.array : [];
+      const len = Number(tuple[1] ?? -1);
+      return (
+        Array.isArray(value) &&
+        value.length === len &&
+        value.every((v) => validateIdlScalarValue(tuple[0], v))
+      );
+    }
+  }
+  return true;
 }
