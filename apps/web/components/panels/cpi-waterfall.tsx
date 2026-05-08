@@ -81,14 +81,19 @@ export function CPIWaterfall({
     return <p className="text-xs text-muted-foreground">Missing signature.</p>;
   }
   if (!root) {
-    return <p className="text-xs text-muted-foreground">No CPI edges for this tx.</p>;
+    return (
+      <p className="text-xs text-muted-foreground">No CPI edges for this tx.</p>
+    );
   }
 
   const h = hierarchy(root);
   const layout = tree<any>().nodeSize([80, 48]);
   const laid = layout(h);
   const nodes = laid.descendants().slice(1);
-  const maxCu = Math.max(1, ...nodes.map((n) => Number(n.data.cu_consumed || 0)));
+  const maxCu = Math.max(
+    1,
+    ...nodes.map((n) => Number(n.data.cu_consumed || 0)),
+  );
 
   return (
     <div className="space-y-2">
@@ -99,7 +104,10 @@ export function CPIWaterfall({
         {nodes.map((n, idx) => {
           const x = n.depth * 120 + 16;
           const y = idx * 34 + 12;
-          const width = Math.max(36, (Number(n.data.cu_consumed || 0) / maxCu) * 420);
+          const width = Math.max(
+            36,
+            (Number(n.data.cu_consumed || 0) / maxCu) * 420,
+          );
           const failed = String(n.data.status || "").includes("fail");
           return (
             <g key={`${n.data.child_ix_index}-${idx}`}>
@@ -114,7 +122,8 @@ export function CPIWaterfall({
                 onClick={() => setSelected(n.data as EdgeRow)}
               />
               <text x={x + 6} y={y + 14} fontSize={10} fill="white">
-                {KNOWN_PROGRAMS[n.data.callee_program] ?? n.data.callee_program.slice(0, 12)}
+                {KNOWN_PROGRAMS[n.data.callee_program] ??
+                  n.data.callee_program.slice(0, 12)}
               </text>
               {Number(n.data.hidden_siblings || 0) > 0 && (
                 <text x={x + width + 8} y={y + 14} fontSize={10} fill="#64748b">

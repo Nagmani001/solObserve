@@ -54,7 +54,9 @@ export default function BulkReplayPage({
           Refresh progress
         </Button>
       </div>
-      {bulkId && <p className="text-xs text-muted-foreground">Bulk ID: {bulkId}</p>}
+      {bulkId && (
+        <p className="text-xs text-muted-foreground">Bulk ID: {bulkId}</p>
+      )}
       {status && (
         <pre className="max-h-[65vh] overflow-auto rounded border bg-muted/30 p-3 text-xs">
           {JSON.stringify(status, null, 2)}

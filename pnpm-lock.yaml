@@ -150,6 +150,9 @@ importers:
       d3-array:
         specifier: ^3.2.4
         version: 3.2.4
+      d3-hierarchy:
+        specifier: ^3.1.2
+        version: 3.1.2
       d3-interpolate:
         specifier: ^3.0.1
         version: 3.0.1
@@ -205,6 +208,9 @@ importers:
       '@types/d3-array':
         specifier: ^3.2.1
         version: 3.2.2
+      '@types/d3-hierarchy':
+        specifier: ^3.1.7
+        version: 3.1.7
       '@types/d3-interpolate':
         specifier: ^3.0.4
         version: 3.0.4
@@ -2214,6 +2220,9 @@ packages:
   '@types/d3-geo@3.1.0':
     resolution: {integrity: sha512-856sckF0oP/diXtS4jNsiQw/UuK5fQG8l/a9VVLeSouf1/PPbBE1i1W852zVwKwYCBkFJJB7nCFTbk6UMEXBOQ==}
 
+  '@types/d3-hierarchy@3.1.7':
+    resolution: {integrity: sha512-tJFtNoYBtRtkNysX1Xq4sxtjK8YgoWUNpIiUee0/jHGRwqvzYxkq0hGVbbOGSz+JgFxxRu4K8nb3YpG3CMARtg==}
+
   '@types/d3-interpolate@3.0.1':
     resolution: {integrity: sha512-jx5leotSeac3jr0RePOH1KdR9rISG91QIE4Q2PYTu4OymLTZfA3SrnURSLzKH48HmXVUru50b8nje4E79oQSQw==}
 
@@ -2823,6 +2832,10 @@ packages:
 
   d3-geo@3.1.0:
     resolution: {integrity: sha512-JEo5HxXDdDYXCaWdwLRt79y7giK8SbhZJbFWXqbRTolCHFI5jRqteLzCsq51NKbUoX0PjBVSohxrx+NoOUujYA==}
+    engines: {node: '>=12'}
+
+  d3-hierarchy@3.1.2:
+    resolution: {integrity: sha512-FX/9frcub54beBdugHjDCdikxThEqjnR93Qt7PvQTOHxyiNCAlvMrHhclk3cD5VeAaq9fxmfRp+CnWw9rEMBuA==}
     engines: {node: '>=12'}
 
   d3-interpolate@3.0.1:
@@ -6663,6 +6676,8 @@ snapshots:
     dependencies:
       '@types/geojson': 7946.0.16
 
+  '@types/d3-hierarchy@3.1.7': {}
+
   '@types/d3-interpolate@3.0.1':
     dependencies:
       '@types/d3-color': 3.1.0
@@ -7420,6 +7435,8 @@ snapshots:
   d3-geo@3.1.0:
     dependencies:
       d3-array: 3.2.4
+
+  d3-hierarchy@3.1.2: {}
 
   d3-interpolate@3.0.1:
     dependencies:

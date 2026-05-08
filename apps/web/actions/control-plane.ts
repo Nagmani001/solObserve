@@ -793,10 +793,13 @@ export async function searchTraces(
     limit?: number;
   },
 ) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/traces/search`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/traces/search`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -808,10 +811,13 @@ export async function runBulkReplay(
     modifications?: Array<Record<string, unknown>>;
   },
 ) {
-  const res = await authedBackendFetch(`/v1/programs/${programId}/replay/bulk`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/replay/bulk`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
   return (await res.json()) as Record<string, unknown>;
 }
 

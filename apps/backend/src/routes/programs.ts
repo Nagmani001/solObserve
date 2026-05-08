@@ -1612,11 +1612,13 @@ programsRouter.post("/:id/replay/jobs", async (req, res) => {
     where: { id: job.id },
     data: {
       status: simulation.status === "succeeded" ? "succeeded" : "failed",
-      cuConsumed: simulation.cu_consumed,
+      cuConsumed: Number(simulation.cu_consumed ?? 0),
       logs: simulation.logs as object,
       accountDiffs: simulation.account_diffs as object,
       decodedResult: simulation.decoded_result as object,
-      historicalStateUnavailable: simulation.historical_state_unavailable,
+      historicalStateUnavailable: Boolean(
+        simulation.historical_state_unavailable,
+      ),
       executedAt: new Date(),
     },
   });
@@ -1825,15 +1827,17 @@ programsRouter.post("/:id/replay/bulk", async (req, res) => {
         where: { id: row.id },
         data: {
           status: simulation.status === "succeeded" ? "succeeded" : "failed",
-          cuConsumed: simulation.cu_consumed,
+          cuConsumed: Number(simulation.cu_consumed ?? 0),
           logs: simulation.logs as object,
           accountDiffs: simulation.account_diffs as object,
           decodedResult: {
             ...(simulation.decoded_result as object),
             bulk_id: bulkId,
             error_name: simulation.error_name ?? null,
-          },
-          historicalStateUnavailable: simulation.historical_state_unavailable,
+          } as object,
+          historicalStateUnavailable: Boolean(
+            simulation.historical_state_unavailable,
+          ),
           executedAt: new Date(),
         },
       });
@@ -2816,7 +2820,10 @@ function validateReplayModifications(
     if (mod.type === "OverrideLamports") {
       const lamports = Number(mod.lamports ?? -1);
       if (!Number.isFinite(lamports) || lamports < 0) {
-        return { ok: false, message: "OverrideLamports requires lamports >= 0" };
+        return {
+          ok: false,
+          message: "OverrideLamports requires lamports >= 0",
+        };
       }
     }
   }
@@ -2826,7 +2833,8 @@ function validateReplayModifications(
 function validateIdlScalarValue(typeShape: unknown, value: unknown): boolean {
   if (typeof typeShape === "string") {
     if (["u8", "u16", "u32", "u64", "u128"].includes(typeShape)) {
-      if (typeof value === "number") return Number.isFinite(value) && value >= 0;
+      if (typeof value === "number")
+        return Number.isFinite(value) && value >= 0;
       if (typeof value === "string") return /^\d+$/.test(value);
       return false;
     }
@@ -2838,7 +2846,9 @@ function validateIdlScalarValue(typeShape: unknown, value: unknown): boolean {
     if (typeShape === "bool") return typeof value === "boolean";
     if (typeShape === "string") return typeof value === "string";
     if (typeShape === "pubkey") {
-      return typeof value === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+      return (
+        typeof value === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)
+      );
     }
     return true;
   }

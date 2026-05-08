@@ -11,7 +11,9 @@ export default function TracesPage({
   params: { programId: string };
 }) {
   const programId = useMemo(() => params.programId, [params.programId]);
-  const [callee, setCallee] = useState("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const [callee, setCallee] = useState(
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  );
   const [amountGt, setAmountGt] = useState("");
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
 
@@ -30,7 +32,9 @@ export default function TracesPage({
             const out = await searchTraces(programId, {
               structural_pattern: {
                 my_program_calls: callee,
-                ...(amountGt.trim() ? { with_amount_gt: Number(amountGt) } : {}),
+                ...(amountGt.trim()
+                  ? { with_amount_gt: Number(amountGt) }
+                  : {}),
               },
               time_range: {
                 from: Date.now() - 24 * 60 * 60 * 1000,
@@ -38,7 +42,12 @@ export default function TracesPage({
               },
               limit: 100,
             });
-            setRows(((out.rows as Array<Record<string, unknown>>) ?? []).slice(0, 100));
+            setRows(
+              ((out.rows as Array<Record<string, unknown>>) ?? []).slice(
+                0,
+                100,
+              ),
+            );
           }}
         >
           Search
@@ -56,7 +65,10 @@ export default function TracesPage({
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={`${String(r.signature ?? "")}-${i}`} className="border-b">
+              <tr
+                key={`${String(r.signature ?? "")}-${i}`}
+                className="border-b"
+              >
                 <td className="px-2 py-1 font-mono">
                   {String(r.signature ?? "").slice(0, 18)}...
                 </td>

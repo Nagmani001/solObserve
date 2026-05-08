@@ -136,7 +136,10 @@ export function ReplayPanel({ programId }: { programId: string }) {
           placeholder="Scenario name"
         />
         {error && <p className="text-xs text-red-600">{error}</p>}
-        <Link className="text-xs underline" href={`/p/${programId}/replay/bulk`}>
+        <Link
+          className="text-xs underline"
+          href={`/p/${programId}/replay/bulk`}
+        >
           Open bulk replay
         </Link>
         {result && (
