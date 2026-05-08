@@ -2538,6 +2538,105 @@ programsRouter.post(
   },
 );
 
+// ---------------------------------------------------------------------------
+// Plan 11: SDK schema registration (§11.4)
+// ---------------------------------------------------------------------------
+
+const sdkSchemaUpsertBody = z.object({
+  name: z.string().min(1).max(64),
+  version: z.number().int().min(1).max(1024).optional().default(1),
+  schema_json: z.record(z.string(), z.unknown()),
+});
+
+programsRouter.get("/:id/sdk-schemas", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "viewer",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const rows = await prisma.sdkSchema.findMany({
+    where: { programIdFk: program.id },
+    orderBy: [{ name: "asc" }, { version: "desc" }],
+  });
+  return res.json({ schemas: rows });
+});
+
+programsRouter.post("/:id/sdk-schemas", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  const parsed = sdkSchemaUpsertBody.safeParse(req.body);
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ error: "invalid_body", details: parsed.error.flatten() });
+  const row = await prisma.sdkSchema.upsert({
+    where: {
+      programIdFk_name_version: {
+        programIdFk: program.id,
+        name: parsed.data.name,
+        version: parsed.data.version,
+      },
+    },
+    create: {
+      programIdFk: program.id,
+      name: parsed.data.name,
+      version: parsed.data.version,
+      schemaJson: parsed.data.schema_json as object,
+    },
+    update: { schemaJson: parsed.data.schema_json as object },
+  });
+  await writeAuditRow(prisma, {
+    orgId: program.project.orgId,
+    actorUserId: access.appUserId,
+    action: "sdk_schema.upsert",
+    targetType: "program",
+    targetId: program.id,
+    metadata: { name: parsed.data.name, version: parsed.data.version },
+  });
+  return res.status(201).json({ schema: row });
+});
+
+programsRouter.delete("/:id/sdk-schemas/:schemaId", async (req, res) => {
+  const authCtx = req.solobserveAuth;
+  if (!authCtx) return res.status(401).json({ error: "unauthorized" });
+  const program = await prisma.solanaProgram.findUnique({
+    where: { id: req.params.id },
+    include: { project: true },
+  });
+  if (!program) return res.status(404).json({ error: "not_found" });
+  const access = await assertOrgAccess(
+    authCtx,
+    program.project.orgId,
+    "editor",
+  );
+  if ("error" in access) return res.status(access.status).json(access.body);
+  await prisma.sdkSchema
+    .delete({
+      where: { id: req.params.schemaId },
+    })
+    .catch(() => null);
+  return res.json({ ok: true });
+});
+
 function defaultRpcForCluster(cluster: string): string {
   if (cluster === "devnet") return "https://api.devnet.solana.com";
   if (cluster === "testnet") return "https://api.testnet.solana.com";

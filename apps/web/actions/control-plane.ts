@@ -828,3 +828,39 @@ export async function getBulkReplayStatus(programId: string, bulkId: string) {
   );
   return (await res.json()) as Record<string, unknown>;
 }
+
+export async function listSdkSchemas(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/sdk-schemas`,
+    {
+      method: "GET",
+    },
+  );
+  return (await res.json()) as { schemas: Array<Record<string, unknown>> };
+}
+
+export async function upsertSdkSchema(
+  programId: string,
+  input: {
+    name: string;
+    version?: number;
+    schema_json: Record<string, unknown>;
+  },
+) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/sdk-schemas`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function deleteSdkSchema(programId: string, schemaId: string) {
+  const res = await authedBackendFetch(
+    `/v1/programs/${programId}/sdk-schemas/${schemaId}`,
+    { method: "DELETE" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}

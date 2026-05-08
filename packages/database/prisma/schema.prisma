@@ -313,10 +313,27 @@ model SolanaProgram {
   alertSilences AlertSilence[]
   replayScenarios ReplayScenario[]
   replayResults ReplayResult[]
+  sdkSchemas SdkSchema[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
   @@map("programs")
+}
+
+model SdkSchema {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk String   @map("program_id_fk") @db.Uuid
+  name        String
+  version     Int      @default(1)
+  schemaJson  Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@unique([programIdFk, name, version])
+  @@index([programIdFk])
+  @@map("sdk_schemas")
 }
 
 model ReplayScenario {

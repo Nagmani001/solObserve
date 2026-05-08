@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+pub mod sobs;
+pub use sobs::{
+    EventMsg, MetricMsg, ShortStr, SobsDecodeError, SobsMsg, SpanEndMsg, SpanStartMsg, SpanStatus,
+    SOBS_PREFIX, SOBS_VERSION,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RawTxMsg {
     pub cluster: String,

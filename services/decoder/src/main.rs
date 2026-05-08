@@ -16,7 +16,7 @@ use solobserve_config::Config;
 use solobserve_storage::{
     clickhouse_client, nats_jetstream, pg_pool, run_clickhouse_migrations, s3_client,
 };
-use solobserve_types::{DecodedFailureMsg, DecodedLiveMsg, RawAccountMsg, RawTxMsg};
+use solobserve_types::{DecodedFailureMsg, DecodedLiveMsg, RawAccountMsg, RawTxMsg, SobsMsg};
 use sqlx::{PgPool, Row as SqlxRow};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
@@ -116,6 +116,36 @@ struct AccountWriteRow {
     raw_blob_url: String,
     commitment: String,
     idl_version: u32,
+}
+
+#[derive(Row, Serialize)]
+struct ChSdkMetricRow {
+    cluster: String,
+    program_id: String,
+    name: String,
+    labels: Vec<(String, String)>,
+    value: i64,
+    signature: String,
+    slot: u64,
+    block_time: u32,
+}
+
+#[derive(Row, Serialize)]
+struct ChSpanRow {
+    cluster: String,
+    program_id: String,
+    signature: String,
+    span_id: u64,
+    parent_span_id: Option<u64>,
+    name: String,
+    started_slot: u64,
+    ended_slot: u64,
+    started_ts: u32,
+    ended_ts: u32,
+    status: String,
+    cu_consumed: u32,
+    args_json: String,
+    result_json: String,
 }
 
 #[derive(Row, Serialize)]
@@ -458,6 +488,10 @@ async fn decode_tx_message(
     let mut ix_rows = Vec::new();
     let mut event_rows = Vec::new();
     let mut edges = Vec::new();
+    let mut sdk_metric_rows: Vec<ChSdkMetricRow> = Vec::new();
+    let mut open_spans: std::collections::HashMap<u64, (String, u64, u32, String)> =
+        std::collections::HashMap::new();
+    let mut span_rows: Vec<ChSpanRow> = Vec::new();
 
     // Parse canonical CPI invoke/consumed lines.
     let mut invoke_stack: Vec<(u16, String, u8)> = Vec::new();
@@ -540,20 +574,111 @@ async fn decode_tx_message(
             continue;
         }
         if let Some(payload) = line.strip_prefix("Program log: __SOBS__:") {
-            event_rows.push(ChEventRow {
-                cluster: raw.cluster.clone(),
-                program_id: raw.program_id.clone(),
-                signature: raw.signature.clone(),
-                slot: raw.slot,
-                block_time: block_ts,
-                event_index: event_rows.len() as u16,
-                ix_index: invoke_stack.last().map(|x| x.0).unwrap_or(0),
-                source: "sdk".to_string(),
-                event_name: "__sdk__".to_string(),
-                payload_json: "{}".to_string(),
-                raw_payload: payload.to_string(),
-                idl_version,
-            });
+            // Format: `<tag>:<base64>` where tag is m | e | s+ | s-.
+            let (tag, b64) = match payload.split_once(':') {
+                Some(p) => p,
+                None => continue,
+            };
+            let frame =
+                match base64::engine::general_purpose::STANDARD_NO_PAD.decode(b64.trim()) {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+            let msg = match SobsMsg::decode_frame(&frame) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let _ = tag;
+            let ix_ix = invoke_stack.last().map(|x| x.0).unwrap_or(0);
+            match msg {
+                SobsMsg::Metric(m) => {
+                    sdk_metric_rows.push(ChSdkMetricRow {
+                        cluster: raw.cluster.clone(),
+                        program_id: raw.program_id.clone(),
+                        name: m.name.0,
+                        labels: m
+                            .labels
+                            .into_iter()
+                            .map(|(k, v)| (k.0, v.0))
+                            .collect(),
+                        value: m.value,
+                        signature: raw.signature.clone(),
+                        slot: raw.slot,
+                        block_time: block_ts,
+                    });
+                }
+                SobsMsg::Event(e) => {
+                    let raw_payload_b64 =
+                        base64::engine::general_purpose::STANDARD_NO_PAD.encode(&e.payload);
+                    let mut payload_json = serde_json::json!({
+                        "raw_b64": raw_payload_b64,
+                        "labels": e.labels.iter().map(|(k, v)| (k.0.clone(), v.0.clone()))
+                            .collect::<std::collections::HashMap<_,_>>(),
+                    });
+                    // Schema lookup attempt (Anchor IDL events first; sdk_schemas
+                    // table consultation deferred to follow-up — payload still
+                    // queryable raw).
+                    if let Some(schema_ref) = schema.as_ref() {
+                        if e.payload.len() >= 8 {
+                            if let Ok((_, decoded)) = decode_event_payload(
+                                &schema_ref.parsed_json,
+                                &e.payload[..8],
+                                &e.payload[8..],
+                            ) {
+                                payload_json["decoded"] = decoded;
+                            }
+                        }
+                    }
+                    event_rows.push(ChEventRow {
+                        cluster: raw.cluster.clone(),
+                        program_id: raw.program_id.clone(),
+                        signature: raw.signature.clone(),
+                        slot: raw.slot,
+                        block_time: block_ts,
+                        event_index: event_rows.len() as u16,
+                        ix_index: ix_ix,
+                        source: "sdk".to_string(),
+                        event_name: e.name.0,
+                        payload_json: payload_json.to_string(),
+                        raw_payload: raw_payload_b64,
+                        idl_version,
+                    });
+                }
+                SobsMsg::SpanStart(s) => {
+                    let args_b64 =
+                        base64::engine::general_purpose::STANDARD_NO_PAD.encode(&s.args);
+                    open_spans.insert(s.id, (s.name.0, raw.slot, block_ts, args_b64));
+                }
+                SobsMsg::SpanEnd(e) => {
+                    if let Some((name, start_slot, start_ts, args_b64)) = open_spans.remove(&e.id) {
+                        let status = match e.status {
+                            0 => "ok",
+                            1 => "err",
+                            2 => "panic",
+                            _ => "unknown",
+                        }
+                        .to_string();
+                        let result_b64 =
+                            base64::engine::general_purpose::STANDARD_NO_PAD.encode(&e.result);
+                        span_rows.push(ChSpanRow {
+                            cluster: raw.cluster.clone(),
+                            program_id: raw.program_id.clone(),
+                            signature: raw.signature.clone(),
+                            span_id: e.id,
+                            parent_span_id: None,
+                            name,
+                            started_slot: start_slot,
+                            ended_slot: raw.slot,
+                            started_ts: start_ts,
+                            ended_ts: block_ts,
+                            status,
+                            cu_consumed: e.cu_consumed,
+                            args_json: serde_json::json!({ "raw_b64": args_b64 }).to_string(),
+                            result_json: serde_json::json!({ "raw_b64": result_b64 }).to_string(),
+                        });
+                    }
+                }
+            }
             continue;
         }
     }
@@ -700,6 +825,22 @@ async fn decode_tx_message(
         ev_insert.write(e).await?;
     }
     ev_insert.end().await?;
+
+    if !sdk_metric_rows.is_empty() {
+        let mut m_insert = ch.insert("sdk_metrics")?;
+        for r in &sdk_metric_rows {
+            m_insert.write(r).await?;
+        }
+        m_insert.end().await?;
+    }
+
+    if !span_rows.is_empty() {
+        let mut s_insert = ch.insert("spans")?;
+        for r in &span_rows {
+            s_insert.write(r).await?;
+        }
+        s_insert.end().await?;
+    }
 
     let mut edge_insert = ch.insert("cpi_edges")?;
     for e in &edges {

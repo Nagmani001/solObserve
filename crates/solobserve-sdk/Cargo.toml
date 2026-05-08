@@ -1,0 +1,26 @@
+[package]
+name = "solobserve-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = ["dev"]
+# Full payloads emitted via msg!(). Use for local validator / devnet.
+dev = []
+# Compile macros to no-ops to remove all CU overhead in release builds.
+release = []
+# Enable the bench harness (pulls in the local validator wrapper). Off by default.
+bench = []
+
+[dependencies]
+solobserve-types = { path = "../solobserve-types" }
+borsh = { version = "1", features = ["derive"] }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+borsh = { version = "1", features = ["derive"] }

@@ -15,6 +15,9 @@ members = [
     "crates/idl-parser",
     "crates/solobserve-dsl",
     "crates/replay-core",
+    "crates/solobserve-sdk",
+    "crates/solobserve-anchor",
+    "services/solobserve-local",
 ]
 
 [workspace.package]
