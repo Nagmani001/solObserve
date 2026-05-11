@@ -857,6 +857,60 @@ export async function upsertSdkSchema(
   return (await res.json()) as Record<string, unknown>;
 }
 
+export async function listCuRuns(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/programs/${programId}/cu-runs`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { runs: Array<Record<string, unknown>> };
+}
+
+export async function getCuTrend(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/programs/${programId}/cu-trend`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { baselines: Array<Record<string, unknown>> };
+}
+
+export async function setCuThresholds(
+  programId: string,
+  thresholds: Record<string, number>,
+) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/programs/${programId}/cu-thresholds`,
+    { method: "PUT", body: JSON.stringify({ thresholds }) },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function listApiKeys(orgId: string) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/orgs/${orgId}/api-keys`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { keys: Array<Record<string, unknown>> };
+}
+
+export async function createApiKey(
+  orgId: string,
+  input: { name: string; scopes: string[] },
+) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/orgs/${orgId}/api-keys`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export async function revokeApiKey(orgId: string, keyId: string) {
+  const res = await authedBackendFetch(
+    `/v1/integrations/orgs/${orgId}/api-keys/${keyId}`,
+    { method: "DELETE" },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+
 export async function deleteSdkSchema(programId: string, schemaId: string) {
   const res = await authedBackendFetch(
     `/v1/programs/${programId}/sdk-schemas/${schemaId}`,

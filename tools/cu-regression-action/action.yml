@@ -1,0 +1,36 @@
+name: "SolObserve CU Regression"
+description: "Compares CU per instruction against the configured SolObserve baseline and fails on regression."
+author: "SolObserve"
+branding:
+  icon: "activity"
+  color: "purple"
+inputs:
+  program-id:
+    description: "SolObserve program UUID (not the on-chain program key)"
+    required: true
+  cluster:
+    description: "Solana cluster the harness runs against"
+    required: false
+    default: "localnet"
+  solobserve-token:
+    description: "API token with scope `cu_runs:write` (format prefix.secret)"
+    required: true
+  solobserve-url:
+    description: "Base URL of the SolObserve API (override for self-host)"
+    required: false
+    default: "https://api.solobserve.dev"
+  threshold-percent:
+    description: "Fail the check if any instruction exceeds baseline by this percent"
+    required: false
+    default: "5"
+  bypass-label:
+    description: "PR label that flips a regression to a passing check"
+    required: false
+    default: "cu-regression-ok"
+  test-command:
+    description: "Command that runs the program test suite (and prints `Program ... consumed N CU` lines)"
+    required: false
+    default: "anchor test --skip-deploy"
+runs:
+  using: "node20"
+  main: "dist/index.js"

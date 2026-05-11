@@ -12,6 +12,7 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import { solobserveAuthMiddleware } from "./middlewares/solobserveAuth";
 import { programsRouter } from "./routes/programs";
 import { orgSettingsRouter } from "./routes/org-settings";
+import { integrationsRouter, githubWebhookRouter } from "./routes/integrations";
 import { prisma } from "@repo/database/client";
 import { initEmail } from "@repo/email/email";
 import { Server } from "http";
@@ -52,7 +53,13 @@ app.use(
 );
 
 app.all("/api/auth/{*any}", toNodeHandler(auth));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  }),
+);
 
 app.get("/health", (req: Request, res: Response) => {
   res.json({
@@ -72,6 +79,10 @@ app.get("/healthz", async (_req: Request, res: Response) => {
 
 app.use("/v1/programs", solobserveAuthMiddleware, programsRouter);
 app.use("/v1/orgs", solobserveAuthMiddleware, orgSettingsRouter);
+// Public (HMAC-verified) webhook surface — no auth middleware.
+app.use("/v1/integrations", githubWebhookRouter);
+// Authenticated integrations surface (API key for CI / session for UI).
+app.use("/v1/integrations", solobserveAuthMiddleware, integrationsRouter);
 app.get("/v1/lookup", async (req: Request, res: Response) => {
   const value = String(req.query.value || "").trim();
   if (!value) return res.status(400).json({ error: "missing_value" });

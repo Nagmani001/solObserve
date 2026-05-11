@@ -254,6 +254,7 @@ model Org {
   members   OrgMember[]
   apiKeys   ApiKey[]
   auditLogs AuditLog[]
+  ghInstallations GhInstallation[]
   notificationChannels NotificationChannel[]
   notificationRoutes NotificationRoute[]
   oncallSchedules OncallSchedule[]
@@ -314,10 +315,96 @@ model SolanaProgram {
   replayScenarios ReplayScenario[]
   replayResults ReplayResult[]
   sdkSchemas SdkSchema[]
+  cuThresholds Json @default("{}") @map("cu_thresholds") @db.JsonB
+  cuBaselines CuBaseline[]
+  cuRuns CuRun[]
+  ghRepos GhRepo[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
   @@map("programs")
+}
+
+model GhInstallation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgIdFk        String   @map("org_id_fk") @db.Uuid
+  installationId BigInt   @map("installation_id")
+  accountLogin   String   @map("account_login")
+  accountType    String   @map("account_type")
+  repoIds        BigInt[] @map("repo_ids")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org Org @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+  repos GhRepo[]
+
+  @@unique([installationId])
+  @@index([orgIdFk])
+  @@map("gh_installations")
+}
+
+model GhRepo {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  installationIdFk  String   @map("installation_id_fk") @db.Uuid
+  repoFullName      String   @map("repo_full_name")
+  defaultBranch     String   @default("main") @map("default_branch")
+  linkedProgramIds  String[] @map("linked_program_ids") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  installation GhInstallation @relation(fields: [installationIdFk], references: [id], onDelete: Cascade)
+  cuRuns CuRun[]
+  cuBaselines CuBaseline[]
+  programs SolanaProgram[]
+
+  @@unique([installationIdFk, repoFullName])
+  @@map("gh_repos")
+}
+
+enum CuRunStatus {
+  pending
+  success
+  failed
+  skipped
+}
+
+model CuRun {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk     String      @map("program_id_fk") @db.Uuid
+  repoIdFk        String?     @map("repo_id_fk") @db.Uuid
+  commitSha       String      @map("commit_sha")
+  branch          String
+  prNumber        Int?        @map("pr_number")
+  status          CuRunStatus @default(pending)
+  startedAt       DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt      DateTime?   @map("finished_at") @db.Timestamptz(6)
+  rawMetrics      Json        @default("{}") @map("raw_metrics") @db.JsonB
+  bypassApplied   Boolean     @default(false) @map("bypass_applied")
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  repo    GhRepo?       @relation(fields: [repoIdFk], references: [id], onDelete: SetNull)
+
+  @@index([programIdFk, commitSha])
+  @@index([programIdFk, branch])
+  @@map("cu_runs")
+}
+
+model CuBaseline {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk      String   @map("program_id_fk") @db.Uuid
+  repoIdFk         String?  @map("repo_id_fk") @db.Uuid
+  branch           String
+  commitSha        String   @map("commit_sha")
+  instructionName  String   @map("instruction_name")
+  cuP50            Int      @map("cu_p50")
+  cuP95            Int      @map("cu_p95")
+  runId            String?  @map("run_id") @db.Uuid
+  capturedAt       DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+  repo    GhRepo?       @relation(fields: [repoIdFk], references: [id], onDelete: SetNull)
+
+  @@unique([programIdFk, branch, commitSha, instructionName])
+  @@index([programIdFk, branch])
+  @@map("cu_baselines")
 }
 
 model SdkSchema {
