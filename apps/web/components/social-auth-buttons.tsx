@@ -41,7 +41,12 @@ export function SocialAuthButtons() {
           type="button"
           onClick={() => handleSocialSignIn("google")}
           disabled={loadingProvider !== null}
-          className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-surface-strong)] py-3 text-sm font-semibold text-[var(--auth-text)] hover:bg-[var(--auth-surface)]"
+          className="h-auto w-full justify-center gap-2 rounded border py-2.5 text-[13px] font-medium"
+          style={{
+            background: "var(--bg-elevated)",
+            color: "var(--ink)",
+            borderColor: "var(--line-strong)",
+          }}
         >
           <GoogleIcon />
           {loadingProvider === "google"

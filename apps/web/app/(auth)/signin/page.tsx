@@ -1,16 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
 import { signinSchema, signinType } from "@repo/common/zodTypes";
-import { Label } from "@repo/ui/components/label";
 import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth";
 import { toast } from "@repo/ui/lib/toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { GenericAuthPage } from "@/components/generic-auth-page";
+import { OnboardShell, withStatus } from "@/components/onboard-shell";
+import {
+  Divider,
+  FieldError,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
 import { SocialAuthButtons } from "@/components/social-auth-buttons";
 import { MagicLinkBlock } from "./magic-link-block";
 
@@ -41,102 +45,95 @@ export default function Page() {
   });
 
   return (
-    <GenericAuthPage
-      title="Welcome back"
-      subtitle="Sign in to your account"
-      footerLabel="Don't have an account?"
-      footerHref="/signup"
-      footerHrefLabel="Sign up"
+    <OnboardShell
+      steps={withStatus(1)}
+      eyebrow="Step 01 of 04"
+      title="Sign in"
+      description="Pick up where you left off. Magic link, password, or OAuth."
+      footer={
+        <span>
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-medium hover:opacity-80"
+            style={{ color: "var(--accent)" }}
+          >
+            Sign up
+          </Link>
+        </span>
+      }
     >
       <SocialAuthButtons />
 
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-[var(--auth-border)]" />
-        <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--auth-text-muted)]">
-          magic link or password
-        </span>
-        <div className="h-px flex-1 bg-[var(--auth-border)]" />
-      </div>
+      <Divider label="or" />
 
       <MagicLinkBlock />
+
+      <Divider label="password" />
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
-
-          const parsed = signinSchema.safeParse({
-            email,
-            password,
-          });
-
+          const parsed = signinSchema.safeParse({ email, password });
           if (!parsed.success) {
-            const fieldErrors = parsed.error.flatten().fieldErrors;
-            setErrors({
-              email: fieldErrors.email?.[0],
-              password: fieldErrors.password?.[0],
-            });
+            const fe = parsed.error.flatten().fieldErrors;
+            setErrors({ email: fe.email?.[0], password: fe.password?.[0] });
             return;
           }
-
           setErrors({});
-          mutation.mutate({
-            email,
-            password,
-          });
+          mutation.mutate({ email, password });
         }}
         className="space-y-4"
       >
         <div>
-          <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-            Email
-          </Label>
-          <Input
+          <FieldLabel htmlFor="signin-email">Email</FieldLabel>
+          <FieldInput
+            id="signin-email"
             type="email"
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
-              setErrors((prev) => ({ ...prev, email: undefined }));
+              setErrors((p) => ({ ...p, email: undefined }));
             }}
-            className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
             placeholder="you@example.com"
+            autoComplete="email"
           />
-          {errors.email && (
-            <p className="mt-1 text-sm text-destructive">{errors.email}</p>
-          )}
+          <FieldError>{errors.email}</FieldError>
         </div>
         <div>
-          <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-            Password
-          </Label>
-          <Input
+          <div className="flex items-baseline justify-between">
+            <FieldLabel htmlFor="signin-password">Password</FieldLabel>
+            <Link
+              href="/forgot-password"
+              className="text-[11px] hover:opacity-80"
+              style={{ color: "var(--ink-mid)" }}
+            >
+              Forgot?
+            </Link>
+          </div>
+          <FieldInput
+            id="signin-password"
             type="password"
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
-              setErrors((prev) => ({ ...prev, password: undefined }));
+              setErrors((p) => ({ ...p, password: undefined }));
             }}
-            className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
             placeholder="••••••••"
+            autoComplete="current-password"
           />
-          {errors.password && (
-            <p className="mt-1 text-sm text-destructive">{errors.password}</p>
-          )}
-          <div className="flex justify-end">
-            <Link
-              href="/forgot-password"
-              className="text-xs text-[var(--auth-color-primary)] hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <FieldError>{errors.password}</FieldError>
         </div>
-        <Button
-          type="submit"
-          className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-color-primary)] py-3 text-sm font-semibold text-[var(--app-color-foreground)] shadow-[0_18px_32px_-18px_var(--auth-color-primary)] hover:brightness-105"
-        >
-          Sign In
-        </Button>
+        <div className="pt-2">
+          <PrimaryButton
+            type="submit"
+            disabled={mutation.isPending}
+            className="w-full"
+          >
+            {mutation.isPending ? "Signing in…" : "Sign in"}
+          </PrimaryButton>
+        </div>
       </form>
-    </GenericAuthPage>
+    </OnboardShell>
   );
 }

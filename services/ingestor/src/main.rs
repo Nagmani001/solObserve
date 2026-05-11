@@ -29,6 +29,9 @@ struct ProgramConfig {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("install rustls crypto provider");
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     let cfg = Config::from_env().map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -374,7 +377,7 @@ async fn ingest_signature(
         .is_ok();
     if !exists {
         let (raw, source_ep) = rpc
-            .get_transaction_with_source(signature, "processed")
+            .get_transaction_with_source(signature, "confirmed")
             .await?;
         rpc_source = short_hash(&source_ep);
         let data = serde_json::to_vec(&raw)?;

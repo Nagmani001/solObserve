@@ -1,16 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
 import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth";
 import { toast } from "@repo/ui/lib/toast";
 import { useRouter } from "next/navigation";
-import { GenericAuthPage } from "@/components/generic-auth-page";
+import Link from "next/link";
 import { OtpDialog } from "@/components/otp-dialogue";
 import { emailSchema, passwordSchema } from "@repo/common/zodTypes";
+import { OnboardShell, withStatus } from "@/components/onboard-shell";
+import {
+  FieldError,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
 
 export default function Page() {
   const [email, setEmail] = useState("");
@@ -105,99 +109,95 @@ export default function Page() {
   }
 
   return (
-    <GenericAuthPage
-      title={step === "email" ? "Reset your password" : "Set new password"}
-      subtitle={
+    <OnboardShell
+      steps={withStatus(1)}
+      eyebrow={step === "email" ? "Recover access" : "Set new password"}
+      title={step === "email" ? "Reset password" : "Pick a new password"}
+      description={
         step === "email"
-          ? "Enter your email to receive a verification code"
-          : "Enter your new password"
+          ? "We will send a six-digit code to your email."
+          : "Choose something stronger than the last one."
       }
-      footerLabel="Remember your password?"
-      footerHref="/signin"
-      footerHrefLabel="Sign in"
+      footer={
+        <span>
+          Remember it?{" "}
+          <Link
+            href="/signin"
+            className="font-medium hover:opacity-80"
+            style={{ color: "var(--accent)" }}
+          >
+            Back to sign in
+          </Link>
+        </span>
+      }
     >
       {step === "email" ? (
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
+        <form onSubmit={handleEmailSubmit} className="space-y-5">
           <div>
-            <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-              Email
-            </Label>
-            <Input
+            <FieldLabel htmlFor="fp-email">Email</FieldLabel>
+            <FieldInput
+              id="fp-email"
               type="email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 setEmailError(undefined);
               }}
-              className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               placeholder="you@example.com"
+              autoComplete="email"
             />
-            {emailError && (
-              <p className="mt-1 text-sm text-destructive">{emailError}</p>
-            )}
+            <FieldError>{emailError}</FieldError>
           </div>
-          <Button
+          <PrimaryButton
             type="submit"
             disabled={sendOtpMutation.isPending}
-            className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-color-primary)] py-3 text-sm font-semibold text-[var(--app-color-foreground)] shadow-[0_18px_32px_-18px_var(--auth-color-primary)] hover:brightness-105"
+            className="w-full"
           >
-            {sendOtpMutation.isPending
-              ? "Sending..."
-              : "Send Verification Code"}
-          </Button>
+            {sendOtpMutation.isPending ? "Sending…" : "Send code"}
+          </PrimaryButton>
         </form>
       ) : (
-        <form onSubmit={handleResetSubmit} className="space-y-4">
+        <form onSubmit={handleResetSubmit} className="space-y-5">
           <div>
-            <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-              New Password
-            </Label>
-            <Input
+            <FieldLabel htmlFor="fp-pw">New password</FieldLabel>
+            <FieldInput
+              id="fp-pw"
               type="password"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
-                setPasswordErrors((prev) => ({ ...prev, password: undefined }));
+                setPasswordErrors((p) => ({ ...p, password: undefined }));
               }}
-              className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               placeholder="••••••••"
+              autoComplete="new-password"
             />
-            {passwordErrors.password && (
-              <p className="mt-1 text-sm text-destructive">
-                {passwordErrors.password}
-              </p>
-            )}
+            <FieldError>{passwordErrors.password}</FieldError>
           </div>
           <div>
-            <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-              Confirm Password
-            </Label>
-            <Input
+            <FieldLabel htmlFor="fp-pw2">Confirm</FieldLabel>
+            <FieldInput
+              id="fp-pw2"
               type="password"
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
-                setPasswordErrors((prev) => ({
-                  ...prev,
+                setPasswordErrors((p) => ({
+                  ...p,
                   confirmPassword: undefined,
                 }));
               }}
-              className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
               placeholder="••••••••"
+              autoComplete="new-password"
             />
-            {passwordErrors.confirmPassword && (
-              <p className="mt-1 text-sm text-destructive">
-                {passwordErrors.confirmPassword}
-              </p>
-            )}
+            <FieldError>{passwordErrors.confirmPassword}</FieldError>
           </div>
-          <Button
+          <PrimaryButton
             type="submit"
             disabled={resetMutation.isPending}
-            className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-color-primary)] py-3 text-sm font-semibold text-[var(--app-color-foreground)] shadow-[0_18px_32px_-18px_var(--auth-color-primary)] hover:brightness-105"
+            className="w-full"
           >
-            {resetMutation.isPending ? "Resetting..." : "Reset Password"}
-          </Button>
+            {resetMutation.isPending ? "Resetting…" : "Reset password"}
+          </PrimaryButton>
         </form>
       )}
 
@@ -209,6 +209,6 @@ export default function Page() {
         onResend={() => sendOtpMutation.mutate(email)}
         isLoading={false}
       />
-    </GenericAuthPage>
+    </OnboardShell>
   );
 }

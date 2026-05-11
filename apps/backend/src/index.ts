@@ -1,3 +1,7 @@
+// @ts-expect-error: extend BigInt for JSON serialization
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
 import express, { Request, Response } from "express";
 import { toNodeHandler } from "better-auth/node";
 import { dirname } from "path";

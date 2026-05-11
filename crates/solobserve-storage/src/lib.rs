@@ -76,7 +76,22 @@ pub async fn run_clickhouse_migrations(client: &clickhouse::Client) -> Result<()
             continue;
         }
         let sql = std::fs::read_to_string(e.path()).context("read clickhouse sql file")?;
-        for stmt in sql.split(';').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        let stripped: String = sql
+            .lines()
+            .map(|l| {
+                if let Some(idx) = l.find("--") {
+                    &l[..idx]
+                } else {
+                    l
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        for stmt in stripped
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
             client
                 .query(stmt)
                 .execute()

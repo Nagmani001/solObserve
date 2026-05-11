@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
 import { authClient } from "@/lib/auth";
 import { toast } from "@repo/ui/lib/toast";
+import {
+  FieldHint,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
 
 export function MagicLinkBlock() {
   const [email, setEmail] = useState("");
@@ -32,30 +35,27 @@ export function MagicLinkBlock() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-2.5">
       <div>
-        <Label className="text-xs text-[var(--auth-text-muted)]">
-          Magic link
-        </Label>
-        <Input
+        <FieldLabel htmlFor="magic-email">Magic link</FieldLabel>
+        <FieldInput
+          id="magic-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@company.com"
-          className="mt-1"
+          autoComplete="email"
         />
-        <p className="mt-1 text-xs text-[var(--auth-text-muted)]">
-          Without Resend/SMTP, the link prints in the backend log.
-        </p>
+        <FieldHint>Without SMTP, the link prints to the backend log.</FieldHint>
       </div>
-      <Button
+      <PrimaryButton
         type="submit"
-        variant="outline"
+        variant="secondary"
         disabled={busy}
         className="w-full"
       >
         {busy ? "Sending…" : "Email magic link"}
-      </Button>
+      </PrimaryButton>
     </form>
   );
 }

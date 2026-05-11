@@ -1,28 +1,38 @@
+"use client";
+
 import Link from "next/link";
-import { cn } from "@repo/ui/lib/utils";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { usePathname } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
 import { OrgSwitcher } from "@/components/org-switcher";
 
+const HIDE_PREFIXES = ["/signin", "/signup", "/forgot-password", "/onboarding"];
+
 export function Navbar() {
+  const pathname = usePathname() ?? "";
+  if (HIDE_PREFIXES.some((p) => pathname.startsWith(p))) return null;
+
   return (
     <header
-      className={cn(
-        "sticky top-0 z-50 w-full border-b backdrop-blur",
-        "border-[var(--auth-border)] bg-[var(--auth-base)]/95 text-[var(--auth-text)]",
-      )}
+      className="sticky top-0 z-40 w-full"
+      style={{
+        background: "oklch(98.5% 0.004 80)",
+        borderBottom: "1px solid oklch(90% 0.006 80)",
+        color: "oklch(18% 0.018 250)",
+      }}
     >
-      <div className="mx-auto flex h-14 w-full max-w-screen-2xl items-center justify-between px-4 md:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="grid size-7 place-items-center rounded-full border border-[var(--auth-border)] bg-[var(--auth-surface)] text-xs font-bold text-[var(--auth-text)]">
-            S
-          </div>
-          <span className="text-lg font-bold tracking-tight">solObserve</span>
+      <div className="mx-auto flex h-12 w-full max-w-screen-2xl items-center justify-between px-4 md:px-8">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span
+            className="inline-block size-2 rounded-full"
+            style={{ background: "oklch(58% 0.17 45)" }}
+          />
+          <span className="text-[14px] font-semibold tracking-tight">
+            SolObserve
+          </span>
         </Link>
         <nav className="flex items-center gap-2">
           <OrgSwitcher />
           <UserMenu />
-          <ThemeToggle />
         </nav>
       </div>
     </header>

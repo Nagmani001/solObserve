@@ -2807,6 +2807,7 @@ dependencies = [
  "hex",
  "once_cell",
  "prometheus",
+ "rustls 0.23.40",
  "serde",
  "serde_json",
  "sha2 0.10.9",

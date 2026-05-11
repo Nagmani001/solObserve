@@ -29,7 +29,11 @@ export async function fetchBackendSession(): Promise<SessionUser | null> {
       cache: "no-store",
     });
     if (!res.ok) continue;
-    const data = (await res.json()) as Record<string, unknown>;
+    const data = (await res.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!data) continue;
     const userRaw = data.user as SessionUser | undefined | null;
     if (userRaw?.id) return userRaw;
   }

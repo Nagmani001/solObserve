@@ -1,5 +1,8 @@
 -- Plan 13: ClickHouse MVs + tables for funnel + adjacency + RPC health.
 
+ALTER TABLE events ADD COLUMN IF NOT EXISTS signer String DEFAULT '';
+ALTER TABLE instructions ADD COLUMN IF NOT EXISTS signer String DEFAULT '';
+
 -- Per-minute signer→event index used to scan adjacent slots cheaply for the
 -- sandwich/front-run detector. The base events table is already partitioned
 -- by month; we summarize one row per (signer, minute, program, event_name)

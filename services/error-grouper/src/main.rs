@@ -15,13 +15,13 @@ async fn main() -> Result<()> {
     let pg = pg_pool(&cfg).await?;
     let js = nats_jetstream(&cfg).await?;
 
-    ensure_failure_stream(&js).await?;
-    let stream = js.get_stream("DECODED_FAILURES").await?;
+    let stream = js.get_stream("DECODED_DERIVED").await?;
     let consumer = stream
         .get_or_create_consumer(
             "error-grouper",
             PullConfig {
                 durable_name: Some("error-grouper".to_string()),
+                filter_subject: "decoded.failures.>".to_string(),
                 ..Default::default()
             },
         )

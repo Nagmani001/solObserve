@@ -1,223 +1,126 @@
 "use client";
 
 import { useState } from "react";
-import { signupSchema } from "@repo/common/zodTypes";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
-import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth";
 import { toast } from "@repo/ui/lib/toast";
-import { useRouter } from "next/navigation";
-import { OtpDialog } from "@/components/otp-dialogue";
-import { GenericAuthPage } from "@/components/generic-auth-page";
-import { SocialAuthButtons } from "@/components/social-auth-buttons";
+import Link from "next/link";
+import { OnboardShell, withStatus } from "@/components/onboard-shell";
+import {
+  FieldError,
+  FieldHint,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
 
-interface SignupInputs {
-  name: string;
-  email: string;
-  password: string;
-}
 export default function Page() {
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [errors, setErrors] = useState<{
-    name?: string;
-    email?: string;
-    password?: string;
-  }>({});
-  const router = useRouter();
+  const [error, setError] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  const mutation = useMutation({
-    mutationFn: async (signupInputs: SignupInputs) => {
-      const res = await authClient.signUp.email({
-        email: signupInputs.email,
-        name: signupInputs.name,
-        password: signupInputs.password,
-      });
-      if (res.error) {
-        const isAlreadyRegistered =
-          res.error.code === "USER_ALREADY_EXISTS" ||
-          (res.error.message ?? "").toLowerCase().includes("already exists");
-
-        if (isAlreadyRegistered) {
-          toast.error(
-            "An account with this email already exists. Please sign in.",
-          );
-          router.push("/signin");
-          return;
-        }
-
-        toast.error(res.error.message);
-      } else {
-        const { error } = await authClient.emailOtp.sendVerificationOtp({
-          email: signupInputs.email,
-          type: "email-verification",
-        });
-        if (error) {
-          toast.error(error.message);
-        } else {
-          setEmail(signupInputs.email);
-          toast.success("Verification code sent to your email");
-          setOtpOpen(true);
-        }
-      }
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    },
-  });
-
-  const verifyMutation = useMutation({
-    mutationFn: async (otp: string) => {
-      const res = await authClient.emailOtp.verifyEmail({
-        email,
-        otp,
-      });
-      if (res.error) {
-        toast.error(res.error.message);
-      } else {
-        toast.success("Email verified successfully!");
-        setOtpOpen(false);
-        router.push("/signin");
-      }
-    },
-    onError: (err) => {
-      toast.error(err.message);
-    },
-  });
-
-  async function handleResendOtp() {
-    const { error } = await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: "email-verification",
-    });
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Verification code resent");
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(undefined);
+    const trimmed = email.trim();
+    if (!trimmed || !trimmed.includes("@")) {
+      setError("Enter a valid email");
+      return;
     }
+    setBusy(true);
+    const { error: err } = await authClient.signIn.magicLink({
+      email: trimmed,
+      callbackURL: `${window.location.origin}/orgs`,
+    });
+    setBusy(false);
+    if (err) {
+      toast.error(err.message ?? "Could not send link");
+      setError(err.message ?? "Could not send link");
+      return;
+    }
+    setSent(true);
+    toast.success("Link sent");
   }
 
   return (
-    <GenericAuthPage
-      title="Create your account"
-      subtitle="Create your account to get started"
-      footerLabel="Already have an account?"
-      footerHref="/signin"
-      footerHrefLabel="Sign in"
-    >
-      <SocialAuthButtons />
-
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-[var(--auth-border)]" />
-        <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--auth-text-muted)]">
-          or continue with email
+    <OnboardShell
+      steps={withStatus(1)}
+      eyebrow="Step 01 of 04"
+      title={sent ? "Check your email" : "Create your account"}
+      description={
+        sent
+          ? "We sent a sign-in link to that address. Open it to continue."
+          : "We email you a one-tap sign-in link. No password to forget."
+      }
+      footer={
+        <span>
+          Already have an account?{" "}
+          <Link
+            href="/signin"
+            className="font-medium hover:opacity-80"
+            style={{ color: "var(--accent)" }}
+          >
+            Sign in
+          </Link>
         </span>
-        <div className="h-px flex-1 bg-[var(--auth-border)]" />
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-
-          const parsed = signupSchema.safeParse({
-            username: name,
-            email,
-            password,
-          });
-
-          if (!parsed.success) {
-            const fieldErrors = parsed.error.flatten().fieldErrors;
-            setErrors({
-              name: fieldErrors.username?.[0],
-              email: fieldErrors.email?.[0],
-              password: fieldErrors.password?.[0],
-            });
-            return;
-          }
-
-          setErrors({});
-          mutation.mutate({
-            name,
-            email,
-            password,
-          });
-        }}
-        className="space-y-4"
-      >
-        <div>
-          <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-            Full Name
-          </Label>
-          <Input
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setErrors((prev) => ({ ...prev, name: undefined }));
+      }
+    >
+      {sent ? (
+        <div className="space-y-4">
+          <div
+            className="rounded p-4 text-[13px]"
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--ink)",
+              border: "1px solid var(--line)",
             }}
-            className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-            placeholder="John Doe"
-          />
-          {errors.name && (
-            <p className="mt-1 text-sm text-destructive">{errors.name}</p>
-          )}
-        </div>
-        <div>
-          <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-            Email
-          </Label>
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setErrors((prev) => ({ ...prev, email: undefined }));
+          >
+            Sent to <span className="font-mono">{email}</span>. Link is valid
+            for 15 minutes.
+          </div>
+          <p className="text-[12px]" style={{ color: "var(--ink-faint)" }}>
+            Without SMTP configured in dev, the link prints to your backend
+            terminal. Search the log for{" "}
+            <code className="font-mono">magic-link</code>.
+          </p>
+          <PrimaryButton
+            variant="secondary"
+            onClick={() => {
+              setSent(false);
+              setEmail("");
             }}
-            className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-            placeholder="you@example.com"
-          />
-          {errors.email && (
-            <p className="mt-1 text-sm text-destructive">{errors.email}</p>
-          )}
+          >
+            Send to a different email
+          </PrimaryButton>
         </div>
-        <div>
-          <Label className="mb-1.5 text-sm text-[var(--auth-text-muted)]">
-            Password
-          </Label>
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setErrors((prev) => ({ ...prev, password: undefined }));
-            }}
-            className="h-auto w-full rounded-xl border-[var(--auth-border)] bg-[var(--auth-surface-strong)] px-4 py-3 text-sm text-[var(--auth-text)] placeholder:text-[var(--auth-text-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-            placeholder="••••••••"
-          />
-          {errors.password && (
-            <p className="mt-1 text-sm text-destructive">{errors.password}</p>
-          )}
-        </div>
-        <Button
-          type="submit"
-          className="h-auto w-full rounded-xl border border-[var(--auth-border)] bg-[var(--auth-color-primary)] py-3 text-sm font-semibold text-[var(--app-color-foreground)] shadow-[0_18px_32px_-18px_var(--auth-color-primary)] hover:brightness-105"
-        >
-          Create Account
-        </Button>
-      </form>
-
-      <OtpDialog
-        isOpen={otpOpen}
-        onOpenChange={setOtpOpen}
-        email={email}
-        onSubmit={(otp) => verifyMutation.mutate(otp)}
-        onResend={handleResendOtp}
-        isLoading={verifyMutation.isPending}
-      />
-    </GenericAuthPage>
+      ) : (
+        <form onSubmit={onSubmit} className="space-y-5">
+          <div>
+            <FieldLabel htmlFor="su-email">Email</FieldLabel>
+            <FieldInput
+              id="su-email"
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(undefined);
+              }}
+              placeholder="you@example.com"
+              autoComplete="email"
+              autoFocus
+            />
+            <FieldHint>
+              First time? Account is created when you open the link.
+            </FieldHint>
+            <FieldError>{error}</FieldError>
+          </div>
+          <div className="pt-2">
+            <PrimaryButton type="submit" disabled={busy} className="w-full">
+              {busy ? "Sending…" : "Email magic link"}
+            </PrimaryButton>
+          </div>
+        </form>
+      )}
+    </OnboardShell>
   );
 }

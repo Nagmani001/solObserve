@@ -730,14 +730,11 @@ fn compile_tdigest_base(v: &VectorExpr, params: &mut BTreeMap<String, Value>) ->
     let mut select = vec![format!("toStartOfMinute({}) AS t", def.time_col)];
     select.extend(labels);
     select.push(format!("{td_col}"));
-    let mut groups = vec!["t".to_string()];
-    groups.extend(def.labels.iter().map(|(l, _)| l.to_string()));
     Ok(format!(
-        "SELECT {} FROM {} WHERE {} GROUP BY {}",
+        "SELECT {} FROM {} WHERE {}",
         select.join(", "),
         def.table,
-        where_parts.join(" AND "),
-        groups.join(", ")
+        where_parts.join(" AND ")
     ))
 }
 

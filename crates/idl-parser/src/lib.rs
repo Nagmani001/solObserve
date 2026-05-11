@@ -77,7 +77,8 @@ pub fn parse_idl_value(v: Value) -> Result<Value, ParseError> {
         });
     }
 
-    let accounts_val = root.get("accounts").unwrap();
+    let empty_arr = Value::Array(vec![]);
+    let accounts_val = root.get("accounts").unwrap_or(&empty_arr);
     let accounts_arr = require_array(accounts_val, "accounts")?;
     let mut accounts = Vec::with_capacity(accounts_arr.len());
     for (i, acc) in accounts_arr.iter().enumerate() {
@@ -105,7 +106,7 @@ pub fn parse_idl_value(v: Value) -> Result<Value, ParseError> {
         });
     }
 
-    let events_val = root.get("events").unwrap();
+    let events_val = root.get("events").unwrap_or(&empty_arr);
     let events_arr = require_array(events_val, "events")?;
     let mut events = Vec::with_capacity(events_arr.len());
     for (i, ev) in events_arr.iter().enumerate() {
@@ -133,7 +134,7 @@ pub fn parse_idl_value(v: Value) -> Result<Value, ParseError> {
         });
     }
 
-    let errors_val = root.get("errors").unwrap();
+    let errors_val = root.get("errors").unwrap_or(&empty_arr);
     let errors_arr = require_array(errors_val, "errors")?;
     let mut errors = Vec::with_capacity(errors_arr.len());
     for (i, e) in errors_arr.iter().enumerate() {
@@ -157,7 +158,7 @@ pub fn parse_idl_value(v: Value) -> Result<Value, ParseError> {
         errors.push(NormalizedError { code, name, msg });
     }
 
-    let types_val = root.get("types").unwrap();
+    let types_val = root.get("types").cloned().unwrap_or(Value::Array(vec![]));
     if !types_val.is_array() {
         return Err(ParseError::Invalid("types: expected array".into()));
     }
@@ -170,22 +171,14 @@ pub fn parse_idl_value(v: Value) -> Result<Value, ParseError> {
         accounts,
         events,
         errors,
-        types: types_val.clone(),
+        types: types_val,
     };
 
     serde_json::to_value(normalized).map_err(|e| ParseError::Invalid(e.to_string()))
 }
 
 fn validate_anchor_root(root: &serde_json::Map<String, Value>) -> Result<(), ParseError> {
-    for key in [
-        "address",
-        "metadata",
-        "instructions",
-        "accounts",
-        "types",
-        "events",
-        "errors",
-    ] {
+    for key in ["address", "metadata", "instructions"] {
         if !root.contains_key(key) {
             return Err(ParseError::Invalid(format!(
                 "missing required field `{key}`"
@@ -198,10 +191,11 @@ fn validate_anchor_root(root: &serde_json::Map<String, Value>) -> Result<(), Par
         "metadata.name",
     )?;
     require_array(root.get("instructions").unwrap(), "instructions")?;
-    require_array(root.get("accounts").unwrap(), "accounts")?;
-    require_array(root.get("types").unwrap(), "types")?;
-    require_array(root.get("events").unwrap(), "events")?;
-    require_array(root.get("errors").unwrap(), "errors")?;
+    for key in ["accounts", "types", "events", "errors"] {
+        if let Some(v) = root.get(key) {
+            require_array(v, key)?;
+        }
+    }
     Ok(())
 }
 

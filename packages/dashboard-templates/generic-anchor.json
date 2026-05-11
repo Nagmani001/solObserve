@@ -12,7 +12,7 @@
     {
       "title": "Success rate",
       "panel_type": "single_stat",
-      "query_dsl": "1 - sum(rate(errors_total[5m])) / sum(rate(instruction_calls_total[5m]))",
+      "query_dsl": "sum(rate(instruction_calls_total{status=\"success\"}[5m])) / sum(rate(instruction_calls_total[5m]))",
       "position": { "x": 8, "y": 0, "w": 4, "h": 4 },
       "options": { "format": "percent" }
     },
@@ -33,7 +33,7 @@
     {
       "title": "Latency p95 by instruction",
       "panel_type": "timeseries",
-      "query_dsl": "histogram_quantile(0.95, latency_processed_to_confirmed_ms) by (instruction)",
+      "query_dsl": "avg by (instruction) (latency_wallclock_perceived_ms)",
       "position": { "x": 0, "y": 8, "w": 6, "h": 4 },
       "options": {
         "note": "If latency metric is unavailable in current DSL registry, this panel will show a compile error until latency metrics ship."
@@ -49,7 +49,7 @@
     {
       "title": "Top wallets by call count",
       "panel_type": "table",
-      "query_dsl": "topk(10, sum by (signer) (increase(instruction_calls_total[1d])))",
+      "query_dsl": "topk(10, sum by (signer) (increase(signer_fees_lamports_total[1d])))",
       "position": { "x": 9, "y": 8, "w": 3, "h": 4 },
       "options": {}
     },

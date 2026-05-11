@@ -1,12 +1,5 @@
-import Link from "next/link";
 import { prisma } from "@repo/database/client";
 import { requireOrgRole } from "@/lib/rbac";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@repo/ui/components/tabs";
 import { EmptyState } from "@/components/empty-state";
 import { IngestionPanel } from "@/components/ingestion-panel";
 import { RawStreamPanel } from "@/components/raw-stream-panel";
@@ -17,129 +10,123 @@ import { StatePanel } from "@/components/state-panel";
 import { LogsEventsPanel } from "@/components/logs-events-panel";
 import { AlertsPanel } from "@/components/alerts-panel";
 import { ReplayPanel } from "@/components/replay-panel";
+import { ProgramShell } from "@/components/program-shell";
+import { ProgramOverview } from "@/components/program-overview";
+
+const TAB_KEYS = [
+  "overview",
+  "ingestion",
+  "raw",
+  "dashboards",
+  "logs",
+  "errors",
+  "state",
+  "alerts",
+  "replay",
+  "settings",
+] as const;
+type TabKey = (typeof TAB_KEYS)[number];
 
 export default async function ProgramHomePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orgId: string; projectId: string; programId: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { orgId, projectId, programId } = await params;
+  const { tab } = await searchParams;
   const gate = await requireOrgRole(orgId, "viewer");
 
   const program = await prisma.solanaProgram.findFirst({
-    where: {
-      id: programId,
-      projectId,
-      project: { orgId },
-    },
-    include: {
-      idls: { orderBy: { version: "desc" }, take: 1 },
-    },
+    where: { id: programId, projectId, project: { orgId } },
+    include: { idls: { orderBy: { version: "desc" }, take: 1 } },
   });
 
   if (!program) {
-    return <p className="text-sm text-muted-foreground">Program not found.</p>;
+    return (
+      <div
+        className="p-6 text-[14px]"
+        style={{ color: "oklch(45% 0.012 250)" }}
+      >
+        Program not found.
+      </div>
+    );
   }
+
+  const role = !gate.forbidden && gate.member ? gate.member.role : "viewer";
+  const canSeeRaw = ["owner", "admin"].includes(role);
+  const canEdit = ["owner", "admin", "editor"].includes(role);
+
+  const visible = TAB_KEYS.filter((k) => (k === "raw" ? canSeeRaw : true));
+  const active: TabKey = (visible as readonly string[]).includes(tab ?? "")
+    ? (tab as TabKey)
+    : "overview";
 
   const latest = program.idls[0];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href={`/org/${orgId}/project/${projectId}`}
-          className="text-xs text-muted-foreground hover:underline"
-        >
-          Back to project
-        </Link>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight">
-          {program.displayName}
-        </h1>
-        <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
-          {program.programId}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Cluster {program.cluster} · IDL v{latest?.version ?? "—"}
-        </p>
-      </div>
-
+    <ProgramShell
+      orgId={orgId}
+      projectId={projectId}
+      programId={program.id}
+      programDisplayName={program.displayName}
+      programAddress={program.programId}
+      cluster={program.cluster}
+      idlVersion={latest?.version}
+      activeTab={active}
+      visibleTabs={[...visible]}
+    >
       {program.cluster === "mainnet" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div
+          className="mb-6 rounded p-3 text-[13px]"
+          style={{
+            background: "oklch(96% 0.05 75)",
+            color: "oklch(35% 0.1 60)",
+            border: "1px solid oklch(85% 0.08 75)",
+          }}
+        >
           Public mainnet RPC is heavily rate-limited. For high-traffic programs,
           add free-tier provider endpoints in ingestion settings.
         </div>
       )}
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="ingestion">Ingestion</TabsTrigger>
-          {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
-            <TabsTrigger value="raw">Raw Stream</TabsTrigger>
+      {active === "overview" && (
+        <ProgramOverview
+          orgId={orgId}
+          projectId={projectId}
+          programId={program.id}
+          programAddress={program.programId}
+          cluster={program.cluster}
+        />
+      )}
+      {active === "ingestion" && <IngestionPanel programId={program.id} />}
+      {active === "raw" && canSeeRaw && (
+        <RawStreamPanel
+          programId={program.id}
+          orgId={orgId}
+          projectId={projectId}
+        />
+      )}
+      {active === "dashboards" && (
+        <div className="space-y-8">
+          <DashboardWorkspace programId={program.id} canEdit={canEdit} />
+          {["owner", "admin"].includes(role) && (
+            <PlatformHealthPanel programId={program.id} />
           )}
-          <TabsTrigger value="dashboards">Dashboards</TabsTrigger>
-          <TabsTrigger value="logs">Logs & Events</TabsTrigger>
-          <TabsTrigger value="errors">Errors</TabsTrigger>
-          <TabsTrigger value="state">State</TabsTrigger>
-          <TabsTrigger value="alerts">Alerts</TabsTrigger>
-          <TabsTrigger value="replay">Replay</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-        </TabsList>
-        <TabsContent value="overview" className="mt-6">
-          <EmptyState
-            title="Telemetry pipeline"
-            description="Ingestion now writes raw tx/account data. Decoder + derived metrics ship in plan 4."
-          />
-        </TabsContent>
-        <TabsContent value="ingestion" className="mt-6">
-          <IngestionPanel programId={program.id} />
-        </TabsContent>
-        {!gate.forbidden && ["owner", "admin"].includes(gate.member.role) && (
-          <TabsContent value="raw" className="mt-6">
-            <RawStreamPanel
-              programId={program.id}
-              orgId={orgId}
-              projectId={projectId}
-            />
-          </TabsContent>
-        )}
-        <TabsContent value="dashboards" className="mt-6">
-          <div className="space-y-4">
-            <DashboardWorkspace
-              programId={program.id}
-              canEdit={
-                !gate.forbidden &&
-                ["owner", "admin", "editor"].includes(gate.member.role)
-              }
-            />
-            {!gate.forbidden &&
-              ["owner", "admin"].includes(gate.member.role) && (
-                <PlatformHealthPanel programId={program.id} />
-              )}
-          </div>
-        </TabsContent>
-        <TabsContent value="logs" className="mt-6">
-          <LogsEventsPanel programId={program.id} />
-        </TabsContent>
-        <TabsContent value="errors" className="mt-6">
-          <ErrorsPanel programId={program.id} />
-        </TabsContent>
-        <TabsContent value="state" className="mt-6">
-          <StatePanel programId={program.id} />
-        </TabsContent>
-        <TabsContent value="alerts" className="mt-6">
-          <AlertsPanel programId={program.id} />
-        </TabsContent>
-        <TabsContent value="replay" className="mt-6">
-          <ReplayPanel programId={program.id} />
-        </TabsContent>
-        <TabsContent value="settings" className="mt-6">
-          <EmptyState
-            title="Program settings"
-            description="IDL versions, ingestion credentials, and cluster switches will live here."
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+        </div>
+      )}
+      {active === "logs" && <LogsEventsPanel programId={program.id} />}
+      {active === "errors" && <ErrorsPanel programId={program.id} />}
+      {active === "state" && <StatePanel programId={program.id} />}
+      {active === "alerts" && <AlertsPanel programId={program.id} />}
+      {active === "replay" && <ReplayPanel programId={program.id} />}
+      {active === "settings" && (
+        <EmptyState
+          title="Program settings"
+          description="IDL versions, ingestion credentials, cluster switches."
+        />
+      )}
+    </ProgramShell>
   );
 }

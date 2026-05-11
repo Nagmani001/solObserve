@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
 import { createProject } from "@/actions/control-plane";
 import { toast } from "@repo/ui/lib/toast";
+import {
+  FieldHint,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
 
 export function NewProjectForm({ orgId }: { orgId: string }) {
   const router = useRouter();
@@ -33,20 +36,29 @@ export function NewProjectForm({ orgId }: { orgId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="flex max-w-xl flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-end"
+      className="rounded p-4"
+      style={{
+        background: "oklch(100% 0 0)",
+        border: "1px solid oklch(90% 0.006 80)",
+      }}
     >
-      <div className="flex-1">
-        <Label htmlFor="proj-name">New project</Label>
-        <Input
-          id="proj-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Indexer"
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <FieldLabel htmlFor="proj-name">New project</FieldLabel>
+          <FieldInput
+            id="proj-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="indexer · staking · dex"
+          />
+        </div>
+        <PrimaryButton type="submit" disabled={busy || !name.trim()}>
+          {busy ? "Creating…" : "Create project"}
+        </PrimaryButton>
       </div>
-      <Button type="submit" disabled={busy}>
-        {busy ? "Creating…" : "Create"}
-      </Button>
+      <FieldHint>
+        Group related programs. Most teams use one project per service.
+      </FieldHint>
     </form>
   );
 }

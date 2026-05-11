@@ -2,11 +2,43 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@repo/ui/components/button";
-import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
-import { createOrganization } from "@/actions/control-plane";
 import Link from "next/link";
+import { createOrganization } from "@/actions/control-plane";
+import { OnboardShell, withStatus } from "@/components/onboard-shell";
+import {
+  FieldError,
+  FieldHint,
+  FieldInput,
+  FieldLabel,
+  PrimaryButton,
+} from "@/components/onboard-form";
+
+function NextItem({
+  num,
+  title,
+  body,
+}: {
+  num: string;
+  title: string;
+  body: string;
+}) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className="mt-0.5 font-mono text-[11px] tabular-nums"
+        style={{ color: "var(--ink-faint)" }}
+      >
+        {num}
+      </span>
+      <span>
+        <span className="font-medium" style={{ color: "var(--ink)" }}>
+          {title}
+        </span>
+        <span style={{ color: "var(--ink-mid)" }}> — {body}</span>
+      </span>
+    </li>
+  );
+}
 
 export default function OnboardingPage() {
   const [name, setName] = useState("");
@@ -29,36 +61,71 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Create your first organization
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Organizations group projects and billing for your team (Plan 9 will
-          deepen billing alerts).
-        </p>
-      </div>
-      <form onSubmit={onSubmit} className="space-y-4">
+    <OnboardShell
+      steps={withStatus(2)}
+      eyebrow="Step 02 of 04"
+      title="Create your workspace"
+      description="A workspace groups your projects, programs, and teammates. You can rename or add more later."
+      footer={
+        <Link
+          href="/orgs"
+          className="hover:opacity-80"
+          style={{ color: "var(--ink-mid)" }}
+        >
+          ← Back to workspaces
+        </Link>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-5">
         <div>
-          <Label htmlFor="org-name">Organization name</Label>
-          <Input
+          <FieldLabel htmlFor="org-name">Workspace name</FieldLabel>
+          <FieldInput
             id="org-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Acme Robotics"
+            autoFocus
           />
-          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          <FieldHint>
+            Often the name of your company, team, or product line.
+          </FieldHint>
+          <FieldError>{error}</FieldError>
         </div>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Create"}
-        </Button>
+        <div className="pt-2">
+          <PrimaryButton type="submit" disabled={busy || !name.trim()}>
+            {busy ? "Creating…" : "Continue →"}
+          </PrimaryButton>
+        </div>
       </form>
-      <p className="text-sm text-muted-foreground">
-        <Link href="/orgs" className="underline underline-offset-2">
-          Back to org list
-        </Link>
-      </p>
-    </div>
+
+      <div className="mt-10">
+        <div
+          className="mb-3 text-[10px] font-medium uppercase tracking-[0.08em]"
+          style={{ color: "var(--ink-faint)" }}
+        >
+          What happens next
+        </div>
+        <ol
+          className="space-y-2.5 text-[13px]"
+          style={{ color: "var(--ink-mid)" }}
+        >
+          <NextItem
+            num="03"
+            title="Create a project"
+            body="Buckets your programs by service or feature."
+          />
+          <NextItem
+            num="04"
+            title="Register a program"
+            body="Paste the program ID and Anchor IDL. Ingestion auto-starts."
+          />
+          <NextItem
+            num="—"
+            title="Send traffic, watch it land"
+            body="Decoded ix, error groups, and dashboards within ~5s of each tx."
+          />
+        </ol>
+      </div>
+    </OnboardShell>
   );
 }
