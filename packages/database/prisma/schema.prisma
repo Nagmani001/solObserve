@@ -255,6 +255,7 @@ model Org {
   apiKeys   ApiKey[]
   auditLogs AuditLog[]
   ghInstallations GhInstallation[]
+  tags Tag[]
   notificationChannels NotificationChannel[]
   notificationRoutes NotificationRoute[]
   oncallSchedules OncallSchedule[]
@@ -319,6 +320,10 @@ model SolanaProgram {
   cuBaselines CuBaseline[]
   cuRuns CuRun[]
   ghRepos GhRepo[]
+  mevDetectionEnabled Boolean @default(false) @map("mev_detection_enabled")
+  watchlists Watchlist[]
+  mevFindings MevFinding[]
+  anomalies Anomaly[]
 
   @@unique([projectId, programId, cluster])
   @@index([projectId])
@@ -475,6 +480,10 @@ model Dashboard {
   isTemplateSeeded Boolean  @default(false) @map("is_template_seeded")
   shareToken       String?  @unique @map("share_token")
   shareRedactSigners Boolean @default(true) @map("share_redact_signers")
+  sharePasswordHash String?  @map("share_password_hash")
+  shareExpiresAt    DateTime? @map("share_expires_at") @db.Timestamptz(6)
+  shareRefererAllowlist String[] @default([]) @map("share_referer_allowlist")
+  shareViewCount    Int      @default(0) @map("share_view_count")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -922,4 +931,132 @@ model TrackedAccount {
 
   @@unique([programIdFk, cluster, account])
   @@map("tracked_accounts")
+}
+
+// ---------------------------------------------------------------------------
+// Plan 13 — web3 intelligence layer
+// ---------------------------------------------------------------------------
+
+enum TagScope {
+  public_
+  org
+}
+
+model Address {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  address      String   @unique
+  firstSeenAt  DateTime? @map("first_seen_at") @db.Timestamptz(6)
+  lastSeenAt   DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  solBalance   BigInt?   @map("sol_balance")
+  metadata     Json      @default("{}") @db.JsonB
+
+  tags AddressTag[]
+
+  @@map("addresses")
+}
+
+model Tag {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  scope       TagScope
+  orgIdFk     String?  @map("org_id_fk") @db.Uuid
+  color       String   @default("#888")
+  description String?
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  org      Org?         @relation(fields: [orgIdFk], references: [id], onDelete: Cascade)
+  addresses AddressTag[]
+
+  @@unique([scope, orgIdFk, name])
+  @@map("tags")
+}
+
+model AddressTag {
+  addressIdFk String   @map("address_id_fk") @db.Uuid
+  tagIdFk     String   @map("tag_id_fk") @db.Uuid
+  appliedBy   String?  @map("applied_by") @db.Uuid
+  appliedAt   DateTime @default(now()) @map("applied_at") @db.Timestamptz(6)
+
+  address Address @relation(fields: [addressIdFk], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagIdFk], references: [id], onDelete: Cascade)
+
+  @@id([addressIdFk, tagIdFk])
+  @@map("address_tags")
+}
+
+model TagProposal {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  address     String
+  tagIdFk     String   @map("tag_id_fk") @db.Uuid
+  evidence    Json     @default("{}") @db.JsonB
+  status      String   @default("pending")
+  createdBy   String?  @map("created_by") @db.Uuid
+  reviewedBy  String?  @map("reviewed_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  reviewedAt  DateTime? @map("reviewed_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@map("tag_proposals")
+}
+
+model Watchlist {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk   String   @map("program_id_fk") @db.Uuid
+  name          String
+  addressSet    String[] @default([]) @map("address_set")
+  tagSet        String[] @default([]) @map("tag_set") @db.Uuid
+  createdBy     String?  @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@index([programIdFk])
+  @@map("watchlists")
+}
+
+model MevFinding {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk         String   @map("program_id_fk") @db.Uuid
+  kind                String
+  slot                BigInt
+  signature           String
+  relatedSignatures   String[] @default([]) @map("related_signatures")
+  confidence          Float
+  evidence            Json     @default("{}") @db.JsonB
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@index([programIdFk, kind, createdAt])
+  @@map("mev_findings")
+}
+
+model Anomaly {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  programIdFk  String   @map("program_id_fk") @db.Uuid
+  metric       String
+  bucket       DateTime @db.Timestamptz(6)
+  value        Float
+  baseline     Float
+  zScore       Float    @map("z_score")
+  severity     String   @default("info")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  program SolanaProgram @relation(fields: [programIdFk], references: [id], onDelete: Cascade)
+
+  @@index([programIdFk, metric, bucket])
+  @@map("anomalies")
+}
+
+model RpcEndpoint {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cluster         String
+  endpointUrl     String   @map("endpoint_url")
+  endpointHash    String   @unique @map("endpoint_hash")
+  permanentlyDemoted Boolean @default(false) @map("permanently_demoted")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([cluster, endpointUrl])
+  @@map("rpc_endpoints")
 }

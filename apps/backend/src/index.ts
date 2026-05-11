@@ -13,6 +13,7 @@ import { solobserveAuthMiddleware } from "./middlewares/solobserveAuth";
 import { programsRouter } from "./routes/programs";
 import { orgSettingsRouter } from "./routes/org-settings";
 import { integrationsRouter, githubWebhookRouter } from "./routes/integrations";
+import { intelRouter } from "./routes/intel";
 import { prisma } from "@repo/database/client";
 import { initEmail } from "@repo/email/email";
 import { Server } from "http";
@@ -83,6 +84,7 @@ app.use("/v1/orgs", solobserveAuthMiddleware, orgSettingsRouter);
 app.use("/v1/integrations", githubWebhookRouter);
 // Authenticated integrations surface (API key for CI / session for UI).
 app.use("/v1/integrations", solobserveAuthMiddleware, integrationsRouter);
+app.use("/v1/intel", solobserveAuthMiddleware, intelRouter);
 app.get("/v1/lookup", async (req: Request, res: Response) => {
   const value = String(req.query.value || "").trim();
   if (!value) return res.status(400).json({ error: "missing_value" });

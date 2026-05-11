@@ -903,6 +903,131 @@ export async function createApiKey(
   return (await res.json()) as Record<string, unknown>;
 }
 
+export async function listTags(orgId: string) {
+  const res = await authedBackendFetch(`/v1/intel/orgs/${orgId}/tags`, {
+    method: "GET",
+  });
+  return (await res.json()) as { tags: Array<Record<string, unknown>> };
+}
+export async function createTag(
+  orgId: string,
+  input: { name: string; color?: string; description?: string },
+) {
+  const res = await authedBackendFetch(`/v1/intel/orgs/${orgId}/tags`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+export async function tagAddress(address: string, tagId: string) {
+  const res = await authedBackendFetch(`/v1/intel/addresses/${address}/tags`, {
+    method: "POST",
+    body: JSON.stringify({ tag_id: tagId }),
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+export async function listWatchlists(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/watchlists`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { watchlists: Array<Record<string, unknown>> };
+}
+export async function createWatchlist(
+  programId: string,
+  input: { name: string; addresses: string[]; tag_ids: string[] },
+) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/watchlists`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+export async function runFunnel(
+  programId: string,
+  input: { steps: string[]; from: string; to: string; window_seconds?: number },
+) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/analytics/funnel`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+  return (await res.json()) as {
+    steps: string[];
+    levels: Array<{ level: number; users: number }>;
+  };
+}
+export async function listMevFindings(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/mev-findings`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { findings: Array<Record<string, unknown>> };
+}
+export async function setMevDetection(programId: string, enabled: boolean) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/mev-detection`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    },
+  );
+  return (await res.json()) as Record<string, unknown>;
+}
+export async function listAnomalies(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/anomalies`,
+    { method: "GET" },
+  );
+  return (await res.json()) as { anomalies: Array<Record<string, unknown>> };
+}
+export async function getRpcHealth(cluster: string) {
+  const res = await authedBackendFetch(
+    `/v1/intel/rpc-health?cluster=${encodeURIComponent(cluster)}`,
+    {
+      method: "GET",
+    },
+  );
+  return (await res.json()) as {
+    samples: Array<{
+      ts: string;
+      endpoint_label: string;
+      latency_ms: number;
+      success: number;
+      slot_lag: number;
+    }>;
+    endpoints: Array<{
+      id: string;
+      endpointUrl: string;
+      permanentlyDemoted: boolean;
+    }>;
+  };
+}
+export async function demoteRpcEndpoint(id: string) {
+  const res = await authedBackendFetch(`/v1/intel/rpc-endpoints/${id}/demote`, {
+    method: "POST",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+export async function getTemplateRecommendations(programId: string) {
+  const res = await authedBackendFetch(
+    `/v1/intel/programs/${programId}/template-recommendations`,
+    { method: "GET" },
+  );
+  return (await res.json()) as {
+    recommendations: Array<{
+      pack: string;
+      reason: string;
+      confidence: number;
+    }>;
+  };
+}
+
 export async function revokeApiKey(orgId: string, keyId: string) {
   const res = await authedBackendFetch(
     `/v1/integrations/orgs/${orgId}/api-keys/${keyId}`,

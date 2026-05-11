@@ -432,19 +432,15 @@ integrationsRouter.delete("/orgs/:orgId/api-keys/:keyId", async (req, res) => {
 // ---------------------------------------------------------------------------
 
 integrationsRouter.post("/gitlab/webhook", (_req, res) => {
-  return res
-    .status(501)
-    .json({
-      error: "not_implemented",
-      message: "GitLab integration is planned for v2.",
-    });
+  return res.status(501).json({
+    error: "not_implemented",
+    message: "GitLab integration is planned for v2.",
+  });
 });
 
 integrationsRouter.post("/gitlab/cu-runs", (_req, res) => {
-  return res
-    .status(501)
-    .json({
-      error: "not_implemented",
-      message: "GitLab integration is planned for v2.",
-    });
+  return res.status(501).json({
+    error: "not_implemented",
+    message: "GitLab integration is planned for v2.",
+  });
 });

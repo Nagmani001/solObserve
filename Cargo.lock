@@ -2833,6 +2833,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "intel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-nats",
+ "chrono",
+ "clickhouse",
+ "futures",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "solobserve-config",
+ "solobserve-storage",
+ "solobserve-types",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
