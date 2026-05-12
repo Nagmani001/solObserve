@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserMenu } from "@/components/user-menu";
@@ -21,10 +22,14 @@ export function Navbar() {
       }}
     >
       <div className="mx-auto flex h-12 w-full max-w-screen-2xl items-center justify-between px-4 md:px-8">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span
-            className="inline-block size-2 rounded-full"
-            style={{ background: "oklch(58% 0.17 45)" }}
+        <Link href="/" className="flex items-center gap-2">
+          <Image
+            src="/logo.png"
+            alt="SolObserve"
+            width={24}
+            height={24}
+            priority
+            className="size-6"
           />
           <span className="text-[14px] font-semibold tracking-tight">
             SolObserve

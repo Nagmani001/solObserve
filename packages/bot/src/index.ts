@@ -245,16 +245,45 @@ async function ensureInitialized(
   console.log(`[init] ok sig=${sig}`);
 }
 
+async function retry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  tries = 4,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastErr = e;
+      const msg = e?.message ?? String(e);
+      console.warn(`[bot] ${label} attempt ${i + 1}/${tries} failed: ${msg}`);
+      await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function main() {
   const cli = parseArgs();
   console.log(`[bot] cluster=${cli.cluster} program=${cli.program}`);
-  const conn = new Connection(rpcUrl(cli.cluster), "confirmed");
+  const conn = new Connection(rpcUrl(cli.cluster), {
+    commitment: "confirmed",
+    confirmTransactionInitialTimeout: 60_000,
+  });
   const wallet = loadKeypair(cli.keypair);
-  const bal = await conn.getBalance(wallet.publicKey);
+  let bal = 0;
+  try {
+    bal = await retry(() => conn.getBalance(wallet.publicKey), "getBalance");
+  } catch (e: any) {
+    console.warn(
+      `[bot] could not read balance (${e?.message ?? e}); continuing anyway`,
+    );
+  }
   console.log(
     `[bot] wallet=${wallet.publicKey.toBase58()} balance=${(bal / 1e9).toFixed(4)} SOL`,
   );
-  if (bal < 0.05 * 1e9) {
+  if (bal > 0 && bal < 0.05 * 1e9) {
     console.warn(
       "[bot] low balance; run `solana airdrop 2 --url devnet` first",
     );
@@ -276,19 +305,23 @@ async function main() {
   let fail = 0;
   for (let i = 0; i < cli.iterations; i++) {
     const def = callable[i % callable.length];
+    process.stdout.write(`[${i + 1}/${cli.iterations}] ${def.name} … `);
     try {
       const { ix } = buildIx(def, programId, wallet);
       const tx = new Transaction().add(ix);
-      const sig = await sendAndConfirmTransaction(conn, tx, [wallet], {
-        commitment: "confirmed",
+      const { blockhash } = await conn.getLatestBlockhash("confirmed");
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = wallet.publicKey;
+      tx.sign(wallet);
+      const sig = await conn.sendRawTransaction(tx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: "confirmed",
       });
       ok++;
-      console.log(`[${i + 1}/${cli.iterations}] ${def.name} ok ${sig}`);
+      console.log(`ok ${sig.slice(0, 12)}…`);
     } catch (e: any) {
       fail++;
-      console.warn(
-        `[${i + 1}/${cli.iterations}] ${def.name} FAIL ${e.message ?? e}`,
-      );
+      console.log(`FAIL ${e.message ?? e}`);
     }
     await new Promise((r) => setTimeout(r, cli.delayMs));
   }

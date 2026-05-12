@@ -1,4 +1,14 @@
-# solObserve Monorepo
+<p align="center">
+  <img src="logo.png" alt="SolObserve" width="160" />
+</p>
+
+# SolObserve
+
+Drop in an Anchor IDL. See every instruction, decoded, in seconds. Observability layer for Solana programs — ingest, decode, query, alert, replay.
+
+---
+
+## Monorepo
 
 Turborepo monorepo with a Next.js frontend, Express backend, PostgreSQL database, authentication (Better Auth), and email support.
 

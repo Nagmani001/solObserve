@@ -116,8 +116,8 @@ export function PanelRuntime({
   }, [programId, dsl, now, vars.timeRange, shareToken]);
 
   return (
-    <div className="rounded-lg border bg-background p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border bg-background">
+      <div className="panel-drag-handle flex shrink-0 cursor-move items-center justify-between border-b px-3 py-2">
         <h3 className="text-sm font-medium">{panel.title}</h3>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
@@ -125,48 +125,54 @@ export function PanelRuntime({
           </span>
           {canEdit && onEdit && (
             <button
-              className="rounded border px-2 py-0.5 text-[11px]"
-              onClick={onEdit}
+              className="rounded border px-2 py-0.5 text-[11px] hover:bg-muted"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               Edit
             </button>
           )}
         </div>
       </div>
-      {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
-      {error && (
-        <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">
-          {error}
-        </p>
-      )}
-      {!loading && !error && (
-        <PanelRenderer
-          panelType={panel.panelType}
-          series={data.series}
-          options={panel.options}
-          programId={programId}
-          onDrill={async (bucket) => {
-            const res = await getRawStreamFiltered(programId, {
-              from: bucket.from,
-              to: bucket.to,
-              instruction: bucket.labels.instruction,
-              signer: bucket.labels.signer,
-              status: bucket.labels.status,
-              limit: 50,
-            });
-            setDrillRows(
-              ((res as { rows?: Record<string, unknown>[] }).rows ??
-                []) as Record<string, unknown>[],
-            );
-            setDrillOpen(true);
-          }}
-          onTxClick={async (signature) => {
-            const res = await getRawStreamDetail(programId, signature);
-            setDetail(res as Record<string, unknown>);
-            setDetailOpen(true);
-          }}
-        />
-      )}
+      <div className="flex-1 overflow-auto p-3">
+        {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+        {error && (
+          <p className="rounded bg-red-50 px-2 py-1 text-xs text-red-700">
+            {error}
+          </p>
+        )}
+        {!loading && !error && (
+          <PanelRenderer
+            panelType={panel.panelType}
+            series={data.series}
+            options={panel.options}
+            programId={programId}
+            onDrill={async (bucket) => {
+              const res = await getRawStreamFiltered(programId, {
+                from: bucket.from,
+                to: bucket.to,
+                instruction: bucket.labels.instruction,
+                signer: bucket.labels.signer,
+                status: bucket.labels.status,
+                limit: 50,
+              });
+              setDrillRows(
+                ((res as { rows?: Record<string, unknown>[] }).rows ??
+                  []) as Record<string, unknown>[],
+              );
+              setDrillOpen(true);
+            }}
+            onTxClick={async (signature) => {
+              const res = await getRawStreamDetail(programId, signature);
+              setDetail(res as Record<string, unknown>);
+              setDetailOpen(true);
+            }}
+          />
+        )}
+      </div>
       <Dialog open={drillOpen} onOpenChange={setDrillOpen}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>

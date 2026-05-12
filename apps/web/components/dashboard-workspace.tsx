@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import GridLayout, { type Layout } from "react-grid-layout";
+import GridLayoutLib, { WidthProvider, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
+
+const GridLayout = WidthProvider(GridLayoutLib);
 import "react-resizable/css/styles.css";
 import {
   createDashboard,
@@ -266,12 +270,14 @@ export function DashboardWorkspace({
           <GridLayout
             className="layout"
             cols={12}
-            rowHeight={50}
-            width={1200}
+            rowHeight={56}
             isDraggable={canEdit}
             isResizable={canEdit}
             onLayoutChange={onLayoutChange}
             margin={[12, 12]}
+            compactType="vertical"
+            preventCollision={false}
+            draggableHandle=".panel-drag-handle"
           >
             {active.panels.map((panel) => (
               <div
